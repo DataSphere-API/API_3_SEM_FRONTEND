@@ -5,7 +5,7 @@
     <div class="brand-panel">
       <div class="logo-wrapper">
         <div class="logo-box">
-          <span class="logo-placeholder">LOGO</span>
+          <span class="logo-placeholder">FUSEX</span>
         </div>
       </div>
     </div>
