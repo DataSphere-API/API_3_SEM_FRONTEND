@@ -1,7 +1,7 @@
 <template>
-  <LoginView />
+  <EspelhosView />
 </template>
 
 <script setup>
-import LoginView from './views/login.vue'
+import EspelhosView from './views/Espelhos/EspelhosViews.vue'
 </script>
