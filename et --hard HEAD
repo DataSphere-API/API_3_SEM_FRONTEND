@@ -1,0 +1,14 @@
+* [33m1b74a31[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev[m[33m, [m[1;31morigin/dev[m[33m)[m feat(US001-8): tela de espelhos mock
+[31m|[m *   [33meb55359[m[33m ([m[1;35mrefs/stash[m[33m)[m WIP on feat/tela_de_espelhos: e19bd02 feat(US001-8): implementação de telas
+[31m|[m [32m|[m[33m\[m  
+[31m|[m [32m|[m * [33mb0007cc[m index on feat/tela_de_espelhos: e19bd02 feat(US001-8): implementação de telas
+[31m|[m [32m|[m[32m/[m  
+[31m|[m * [33me19bd02[m[33m ([m[1;31morigin/feat/tela_de_espelhos[m[33m, [m[1;32mfeat/tela_de_espelhos[m[33m)[m feat(US001-8): implementação de telas
+[31m|[m * [33ma10aa40[m feat(US001-8): criação da tela de espelhos
+[31m|[m * [33m7e34bb8[m[33m ([m[1;31morigin/feat/tela_de_login[m[33m, [m[1;32mfeat/tela_de_login[m[33m)[m feat(US000-7): protótipo tela de login
+[31m|[m * [33m0036fda[m feat: paleta de cores
+[31m|[m[31m/[m  
+* [33m093900b[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m chore: atualiza o caminho do index.html
+* [33mcde408c[m chore: atualiza o caminho do index.html
+* [33m128f5dc[m chore: cria a estrutura do projeto vuejs
+* [33m0ce0a54[m Initial commit
