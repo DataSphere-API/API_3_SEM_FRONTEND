@@ -1,86 +1,70 @@
-/* color palette from <https://github.com/vuejs/theme> */
 :root {
-  --vt-c-white: #ffffff;
-  --vt-c-white-soft: #f8f8f8;
-  --vt-c-white-mute: #f2f2f2;
+  --primary-color: #5BBF9A;
+  --primary-color-decimal: 91, 191, 154;
 
-  --vt-c-black: #181818;
-  --vt-c-black-soft: #222222;
-  --vt-c-black-mute: #282828;
+  --secondary-color: #A8E6CF;
+  --secondary-color-decimal: 168, 230, 207;
 
-  --vt-c-indigo: #2c3e50;
+  --text-color: #183B32;
+  --text-color-decimal: 24, 59, 50;
 
-  --vt-c-divider-light-1: rgba(60, 60, 60, 0.29);
-  --vt-c-divider-light-2: rgba(60, 60, 60, 0.12);
-  --vt-c-divider-dark-1: rgba(84, 84, 84, 0.65);
-  --vt-c-divider-dark-2: rgba(84, 84, 84, 0.48);
+  --secondary-text-color: #397A65;
+  --secondary-text-color-decimal: 57, 122, 101;
 
-  --vt-c-text-light-1: var(--vt-c-indigo);
-  --vt-c-text-light-2: rgba(60, 60, 60, 0.66);
-  --vt-c-text-dark-1: var(--vt-c-white);
-  --vt-c-text-dark-2: rgba(235, 235, 235, 0.64);
+  --tertiary-text-color: #4F5F59;
+  --tertiary-text-color-decimal: 79, 95, 89;
+
+  --primary-contrast-color: #E8F7F0;
+  --primary-contrast-color-decimal: 232, 247, 240;
+
+  --secondary-contrast-color: #183B32;
+  --secondary-contrast-color-decimal: 24, 59, 50;
+
+  --primary-light-bg-color: #E8F7F0;
+  --primary-light-bg-color-decimal: 232, 247, 240;
+
+  --secondary-light-bg-color: #F1F8E9;
+  --secondary-light-bg-color-decimal: 241, 248, 233;
+
+  --tertiary-light-bg-color: #FAFCFB;
+  --tertiary-light-bg-color-decimal: 250, 252, 251;
+
+  --primary-dark-bg-color: #429978;
+  --primary-dark-bg-color-decimal: 66, 153, 120;
+
+  --secondary-dark-bg-color: #183B32;
+  --secondary-dark-bg-color-decimal: 24, 59, 50;
+
+  --text-light-color: #7A8F87;
+  --text-light-color-decimal: 122, 143, 135;
+
+  --disabled-color: #CDDCD6;
+  --disabled-color-decimal: 205, 220, 214;
+
+  /* Variáveis semânticas do Vue */
+  --color-background: var(--tertiary-light-bg-color);
+  --color-background-soft: var(--primary-light-bg-color);
+  --color-background-mute: #F4F8F6;
+
+  --color-border: rgba(24, 59, 50, 0.10);
+  --color-border-hover: rgba(24, 59, 50, 0.20);
+
+  --color-heading: var(--text-color);
+  --color-text: var(--text-color);
 }
 
-/* semantic color variables for this project */
-:root {
-  --color-background: var(--vt-c-white);
-  --color-background-soft: var(--vt-c-white-soft);
-  --color-background-mute: var(--vt-c-white-mute);
-
-  --color-border: var(--vt-c-divider-light-2);
-  --color-border-hover: var(--vt-c-divider-light-1);
-
-  --color-heading: var(--vt-c-text-light-1);
-  --color-text: var(--vt-c-text-light-1);
-
-  --section-gap: 160px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: var(--vt-c-black);
-    --color-background-soft: var(--vt-c-black-soft);
-    --color-background-mute: var(--vt-c-black-mute);
-
-    --color-border: var(--vt-c-divider-dark-2);
-    --color-border-hover: var(--vt-c-divider-dark-1);
-
-    --color-heading: var(--vt-c-text-dark-1);
-    --color-text: var(--vt-c-text-dark-2);
-  }
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  font-weight: normal;
+.button {
+  border-radius: 9999px;
+  font-family: "Vend Sans", sans-serif;
+  font-weight: 500;
 }
 
 body {
-  min-height: 100vh;
-  color: var(--color-text);
+  font-family: "DM Sans", sans-serif;
+  color: var(--text-color);
   background: var(--color-background);
-  transition:
-    color 0.5s,
-    background-color 0.5s;
-  line-height: 1.6;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Fira Sans',
-    'Droid Sans',
-    'Helvetica Neue',
-    sans-serif;
-  font-size: 15px;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+}
+
+.block-content.small {
+  max-width: 800px;
 }
