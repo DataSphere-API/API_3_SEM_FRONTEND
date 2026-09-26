@@ -1,7 +1,7 @@
 <template>
   <span
     class="status-badge"
-    :class="`status-${status}`"
+    :class="`status-${status.toLowerCase()}`"
   >
     {{ label }}
   </span>
@@ -18,13 +18,14 @@ const props = defineProps({
 })
 
 const labels = {
-  pendente: 'Pendente',
-  gerada: 'Gerada',
-  regerada: 'Regerada'
+  pendente_auditoria: 'Pendente de Auditoria',
+  com_divergencia: 'Com Divergência',
+  encaminhada: 'Encaminhada',
+  aprovada: 'Aprovada'
 }
 
 const label = computed(() => {
-  return labels[props.status] || props.status
+  return labels[props.status.toLowerCase()] || props.status
 })
 </script>
 
@@ -32,26 +33,33 @@ const label = computed(() => {
 .status-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.35rem 0.7rem;
+  justify-content: center;
+  padding: 0.35rem 0.85rem;
   border-radius: 9999px;
-  font-family: "Vend Sans", sans-serif;
-  font-size: 0.72rem;
+  font-family: "Vend Sans", "DM Sans", sans-serif;
+  font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
-.status-pendente {
-  background-color: #FFF4D6;
-  color: #9A6B00;
+.status-pendente_auditoria {
+  background-color: #fef3c7;
+  color: #92400e;
 }
 
-.status-gerada {
-  background-color: var(--primary-light-bg-color);
-  color: var(--secondary-text-color);
+.status-com_divergencia {
+  background-color: #fee2e2;
+  color: #991b1b;
 }
 
-.status-regerada {
-  background-color: var(--secondary-color);
-  color: var(--text-color);
+.status-encaminhada {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.status-aprovada {
+  background-color: #e6f4ea;
+  color: #137333;
 }
 </style>

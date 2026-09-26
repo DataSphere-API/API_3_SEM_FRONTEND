@@ -4,7 +4,7 @@
       <header class="page-header">
         <div>
           <h1>Faturas</h1>
-          <p>Consulte as faturas geradas a partir dos espelhos.</p>
+          <p>Consulte as faturas geradas a partir dos espelhos e realize auditorias.</p>
         </div>
       </header>
 
@@ -46,13 +46,10 @@ const faturas = ref([
     ocs: 'Plani',
     espelhoId: 1,
     data: '20/09/2026',
-    status: 'gerada',
-    podeRegerar: false,
+    status: 'com_divergencia',
     itens: [
       { guiaId: 202611463, procedimento: 'Consulta médica', paciente: 'João da Silva', valorApresentado: 180, valorContratado: 160 },
-      { guiaId: 202611464, procedimento: 'Exame de imagem', paciente: 'Maria Oliveira', valorApresentado: 320, valorContratado: 320 },
-      { guiaId: 202611465, procedimento: 'Exame laboratorial', paciente: 'Carlos Souza', valorApresentado: 145, valorContratado: 120 },
-      { guiaId: 202611466, procedimento: 'Consulta cardiológica', paciente: 'Ana Pereira', valorApresentado: 210, valorContratado: 190 }
+      { guiaId: 202611464, procedimento: 'Exame de imagem', paciente: 'Maria Oliveira', valorApresentado: 320, valorContratado: 320 }
     ]
   },
   {
@@ -60,12 +57,9 @@ const faturas = ref([
     ocs: 'Santa Casa',
     espelhoId: 1,
     data: '21/09/2026',
-    status: 'gerada',
-    podeRegerar: true,
+    status: 'encaminhada',
     itens: [
-      { guiaId: 202611520, procedimento: 'Consulta ortopédica', paciente: 'Pedro Santos', valorApresentado: 190, valorContratado: 180 },
-      { guiaId: 202611521, procedimento: 'Raio-X', paciente: 'Juliana Costa', valorApresentado: 95, valorContratado: 95 },
-      { guiaId: 202611522, procedimento: 'Ultrassonografia', paciente: 'Lucas Almeida', valorApresentado: 170, valorContratado: 150 }
+      { guiaId: 202611520, procedimento: 'Consulta ortopédica', paciente: 'Pedro Santos', valorApresentado: 190, valorContratado: 180 }
     ]
   },
   {
@@ -73,37 +67,42 @@ const faturas = ref([
     ocs: 'Hospital Municipal',
     espelhoId: 1,
     data: '22/09/2026',
-    status: 'pendente',
-    podeRegerar: false,
+    status: 'pendente_auditoria',
     itens: [
-      { guiaId: 202611620, procedimento: 'Consulta clínica', paciente: 'Marcos Oliveira', valorApresentado: 150, valorContratado: 150 },
-      { guiaId: 202611621, procedimento: 'Exame laboratorial', paciente: 'Patrícia Souza', valorApresentado: 125, valorContratado: 110 },
-      { guiaId: 202611622, procedimento: 'Eletrocardiograma', paciente: 'Bruno Ferreira', valorApresentado: 80, valorContratado: 80 }
+      { guiaId: 202611620, procedimento: 'Consulta clínica', paciente: 'Marcos Oliveira', valorApresentado: 150, valorContratado: 150 }
     ]
   },
   {
     id: 5004,
     ocs: 'Hospital São José',
-    espelhoId: 1,
+    espelhoId: 2,
     data: '23/09/2026',
-    status: 'regerada',
-    podeRegerar: false,
+    status: 'com_divergencia',
     itens: [
       { guiaId: 202611700, procedimento: 'Consulta dermatológica', paciente: 'Camila Rodrigues', valorApresentado: 160, valorContratado: 150 },
-      { guiaId: 202611701, procedimento: 'Ultrassonografia', paciente: 'Diego Martins', valorApresentado: 175, valorContratado: 175 },
-      { guiaId: 202611702, procedimento: 'Consulta oftalmológica', paciente: 'Larissa Mendes', valorApresentado: 185, valorContratado: 160 }
+      { guiaId: 202611701, procedimento: 'Ultrassonografia', paciente: 'Diego Martins', valorApresentado: 175, valorContratado: 175 }
     ]
   },
   {
     id: 5005,
-    ocs: 'Hospital Regional',
-    espelhoId: 2,
+    ocs: 'Clinica Cardiológica São Luiz',
+    espelhoId: 3,
     data: '24/09/2026',
-    status: 'gerada',
-    podeRegerar: false,
+    status: 'aprovada',
     itens: [
-      { guiaId: 202611800, procedimento: 'Consulta neurológica', paciente: 'Gustavo Alves', valorApresentado: 230, valorContratado: 210 },
-      { guiaId: 202611801, procedimento: 'Tomografia', paciente: 'Beatriz Santos', valorApresentado: 380, valorContratado: 350 }
+      { guiaId: 202611800, procedimento: 'Eletrocardiograma', paciente: 'Lucia Ferraz', valorApresentado: 110, valorContratado: 110 },
+      { guiaId: 202611801, procedimento: 'Ecocardiograma', paciente: 'Roberto Souza', valorApresentado: 250, valorContratado: 250 }
+    ]
+  },
+  {
+    id: 5006,
+    ocs: 'Laboratório Central',
+    espelhoId: 3,
+    data: '25/09/2026',
+    status: 'pendente_auditoria',
+    itens: [
+      { guiaId: 202611900, procedimento: 'Hemograma Completo', paciente: 'Fernanda Lima', valorApresentado: 45, valorContratado: 45 },
+      { guiaId: 202611901, procedimento: 'Glicemia em Jejum', paciente: 'Gabriel Rocha', valorApresentado: 30, valorContratado: 30 }
     ]
   }
 ])
@@ -120,13 +119,11 @@ function fecharDetalhes() {
 
 function regerarFatura(fatura) {
   const index = faturas.value.findIndex(item => item.id === fatura.id)
-
   if (index === -1) return
 
   faturas.value[index] = {
     ...fatura,
-    status: 'regerada',
-    podeRegerar: false
+    status: 'pendente_auditoria'
   }
 
   faturaSelecionada.value = faturas.value[index]
@@ -137,7 +134,7 @@ function regerarFatura(fatura) {
 .faturas-page {
   min-height: 100vh;
   padding: 2.5rem 1.5rem;
-  background-color: var(--color-background);
+  background-color: var(--color-background, #f9fafb);
 }
 
 .page-content {
@@ -151,7 +148,7 @@ function regerarFatura(fatura) {
 
 .page-header h1 {
   margin: 0;
-  color: var(--text-color);
+  color: var(--text-color, #111827);
   font-family: "DM Sans", sans-serif;
   font-size: 1.8rem;
   font-weight: 700;
@@ -159,16 +156,16 @@ function regerarFatura(fatura) {
 
 .page-header p {
   margin: 0.5rem 0 0;
-  color: var(--text-light-color);
+  color: var(--text-light-color, #6b7280);
   font-size: 0.9rem;
 }
 
 .section-card {
   padding: 1.5rem;
   background-color: #ffffff;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border, #e5e7eb);
   border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(var(--text-color-decimal), 0.04);
+  box-shadow: 0 4px 16px rgba(0,0,0, 0.04);
 }
 
 .section-header {
@@ -180,7 +177,7 @@ function regerarFatura(fatura) {
 
 .section-header h2 {
   margin: 0;
-  color: var(--text-color);
+  color: var(--text-color, #111827);
   font-family: "DM Sans", sans-serif;
   font-size: 1.1rem;
   font-weight: 600;
@@ -188,17 +185,7 @@ function regerarFatura(fatura) {
 
 .section-header p {
   margin: 0.35rem 0 0;
-  color: var(--text-light-color);
+  color: var(--text-light-color, #6b7280);
   font-size: 0.85rem;
-}
-
-@media (max-width: 768px) {
-  .faturas-page {
-    padding: 1.5rem 1rem;
-  }
-
-  .section-card {
-    padding: 1rem;
-  }
 }
 </style>
