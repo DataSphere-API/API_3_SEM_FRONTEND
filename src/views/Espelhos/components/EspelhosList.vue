@@ -19,7 +19,7 @@
           <tr>
             <th>OCS</th>
             <th>Espelho</th>
-            <th>Guias</th>
+            <th>Itens</th>
             <th>Data de recebimento</th>
             <th>Status</th>
             <th>Valor</th>
@@ -45,7 +45,7 @@
             </td>
 
             <td>
-              {{ espelho.guias.length }}
+              {{ espelho.quantidadeItens ?? 0 }}
             </td>
 
             <td>
@@ -110,7 +110,7 @@ const filtros = [
   },
   {
     label: 'Em aberto',
-    valor: 'aberto'
+    valor: 'em_aberto'
   },
   {
     label: 'Faturados',
@@ -137,9 +137,7 @@ function visualizarEspelho(espelho) {
 }
 
 function calcularTotal(espelho) {
-  return espelho.guias.reduce((total, guia) => {
-    return total + (Number(guia.precoCorrigido) || 0)
-  }, 0)
+  return Number(espelho.valorTotal) || 0
 }
 
 function formatarValor(valor) {

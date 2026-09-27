@@ -1,43 +1,3 @@
-<template>
-  <div class="espelhos-page">
-    <main class="page-content">
-      <header class="page-header">
-        <div>
-          <h1>Espelhos</h1>
-
-          <p>
-            Consulte os espelhos recebidos das OCS e suas respectivas guias.
-          </p>
-        </div>
-      </header>
-
-      <section class="section-card">
-        <div class="section-header">
-          <div>
-            <h2>Espelhos existentes</h2>
-
-            <p>
-              Consulte os espelhos recebidos e os valores correspondentes.
-            </p>
-          </div>
-        </div>
-
-        <EspelhosList
-          :espelhos="espelhos"
-          @visualizar="visualizarEspelho"
-        />
-      </section>
-    </main>
-
-    <EspelhoDetalhes
-      :aberto="modalAberto"
-      :espelho="espelhoSelecionado"
-      @fechar="fecharDetalhes"
-      @salvar="salvarEspelho"
-    />
-  </div>
-</template>
-
 <script setup>
 import { onMounted, ref } from 'vue'
 import axios from 'axios'
@@ -54,7 +14,7 @@ async function carregarEspelhos() {
 
     espelhos.value = response.data.map(espelho => ({
       ...espelho,
-      ocs: espelho.ocsId,
+      ocs: espelho.ocsNome || espelho.ocsId,
       data: `${espelho.dataInicio} - ${espelho.dataFim}`,
       status: espelho.status.toLowerCase()
     }))
@@ -91,6 +51,39 @@ onMounted(() => {
 })
 </script>
 
+<template>
+  <div class="espelhos-page">
+    <div class="page-content">
+      <div class="page-header">
+        <div class="header-row">
+          <div>
+            <h1>Espelhos</h1>
+            <p>Acompanhe e corrija os espelhos gerados.</p>
+          </div>
+
+          <router-link to="/espelhos/novo" class="new-button">
+            + Novo espelho
+          </router-link>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <EspelhosList
+          :espelhos="espelhos"
+          @visualizar="visualizarEspelho"
+        />
+      </div>
+    </div>
+
+    <EspelhoDetalhes
+      :aberto="modalAberto"
+      :espelho="espelhoSelecionado"
+      @fechar="fecharDetalhes"
+      @salvar="salvarEspelho"
+    />
+  </div>
+</template>
+
 <style scoped>
 .espelhos-page {
   min-height: 100vh;
@@ -105,6 +98,13 @@ onMounted(() => {
 
 .page-header {
   margin-bottom: 2rem;
+}
+
+.header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .page-header h1 {
@@ -126,33 +126,44 @@ onMounted(() => {
   background-color: #ffffff;
   border: 1px solid var(--color-border);
   border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(var(--text-color-decimal), 0.04);
 }
 
-.section-header {
-  display: flex;
+.new-button {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-}
-
-.section-header h2 {
-  margin: 0;
-  color: var(--text-color);
-  font-family: "DM Sans", sans-serif;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.section-header p {
-  margin: 0.35rem 0 0;
-  color: var(--text-light-color);
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0.7rem 1.2rem;
+  border: 1px solid var(--primary-color);
+  border-radius: 9999px;
+  background-color: var(--primary-color);
+  color: #ffffff;
+  font-family: "Vend Sans", sans-serif;
   font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.new-button:hover {
+  background-color: var(--primary-dark-bg-color);
+  border-color: var(--primary-dark-bg-color);
 }
 
 @media (max-width: 768px) {
   .espelhos-page {
     padding: 1.5rem 1rem;
+  }
+
+  .header-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .new-button {
+    width: 100%;
   }
 
   .section-card {
