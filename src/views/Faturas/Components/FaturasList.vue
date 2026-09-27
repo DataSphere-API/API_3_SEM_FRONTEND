@@ -1,5 +1,6 @@
 <template>
   <div class="faturas-container">
+
     <div class="filters">
       <button
         v-for="filtro in filtros"
@@ -34,20 +35,30 @@
             :key="fatura.id"
           >
             <td>
-              <span class="ocs-name">{{ fatura.ocs }}</span>
+              <span class="ocs-name">
+                {{ fatura.ocsNome || fatura.ocsId }}
+              </span>
             </td>
 
             <td>
-              <span class="fatura-id">#{{ fatura.id }}</span>
+              <span class="fatura-id">
+                #{{ fatura.id }}
+              </span>
             </td>
 
             <td>
-              <span class="espelho-id">#{{ fatura.espelhoId }}</span>
+              <span class="espelho-id">
+                #{{ fatura.espelhoId }}
+              </span>
             </td>
 
-            <td>{{ fatura.itens.length }}</td>
+            <td>
+              {{ fatura.itens?.length || 0 }}
+            </td>
 
-            <td>{{ fatura.data }}</td>
+            <td>
+              {{ fatura.data || '-' }}
+            </td>
 
             <td>
               <StatusBadge :status="fatura.status" />
@@ -80,6 +91,7 @@
         </tbody>
       </table>
     </div>
+
   </div>
 </template>
 
@@ -94,15 +106,25 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['visualizar'])
+const emit = defineEmits([
+  'visualizar'
+])
 
 const filtroSelecionado = ref('todos')
 
 const filtros = [
-  { label: 'Todas', valor: 'todos' },
-  { label: 'Pendentes', valor: 'pendente' },
-  { label: 'Geradas', valor: 'gerada' },
-  { label: 'Regeradas', valor: 'regerada' }
+  {
+    label: 'Todas',
+    valor: 'todos'
+  },
+  {
+    label: 'Ativas',
+    valor: 'ativa'
+  },
+  {
+    label: 'Regeradas',
+    valor: 'regerada'
+  }
 ]
 
 const faturasFiltradas = computed(() => {
@@ -120,6 +142,10 @@ function visualizarFatura(fatura) {
 }
 
 function calcularTotal(fatura) {
+  if (!fatura.itens) {
+    return 0
+  }
+
   return fatura.itens.reduce((total, item) => {
     return total + (Number(item.valorApresentado) || 0)
   }, 0)
@@ -155,7 +181,10 @@ function formatarValor(valor) {
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .filter-button:hover {
@@ -247,7 +276,9 @@ tbody tr:hover {
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .view-button:hover {
