@@ -1,19 +1,17 @@
 <template>
   <div class="app">
-    <EspelhosView />
-    <FaturasView />
+    <NavBar />
+    <router-view :key="$route.fullPath" />
   </div>
 </template>
 
 <script setup>
-import EspelhosView from './views/Espelhos/EspelhosViews.vue'
-import FaturasView from './views/Faturas/FaturasViews.vue'
+import NavBar from './components/NavBar.vue'
 </script>
 
 <style>
 .app {
-  display: flex;
-  flex-direction: column;
-  gap: 3rem;
+  min-height: 100vh;
+  width: 100%;
 }
 </style>
