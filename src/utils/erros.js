@@ -6,38 +6,22 @@ export function erroDeFormato() {
 
 function mensagemDeErro(erro, textos) {
   const resposta = erro?.response
-
   if (!resposta) {
     if (erro?.code === 'ECONNABORTED') {
       return 'O servidor demorou demais para responder. Tente novamente.'
     }
-
     return 'Não foi possível conectar ao servidor. Verifique se o back-end está em execução.'
   }
-
   const dados = resposta.data
-
   if (dados && typeof dados === 'object' && typeof dados.mensagem === 'string') {
     return dados.mensagem
   }
-
-  if (
-    typeof dados === 'string' &&
-    dados.length > 0 &&
-    dados.length <= 200 &&
-    !dados.trim().startsWith('<')
-  ) {
-    return dados.charAt(0).toUpperCase() + dados.slice(1)
-  }
-
   if (textos[resposta.status]) {
     return textos[resposta.status]
   }
-
   if (resposta.status >= 500) {
     return 'O servidor encontrou um erro. Tente novamente em instantes.'
   }
-
   return textos.padrao || 'Não foi possível concluir a operação.'
 }
 
@@ -45,9 +29,7 @@ export function traduzirErro(erro, textos = {}) {
   if (erro?.mensagemUsuario) {
     return erro
   }
-
   console.error(erro)
-
   const dados = erro?.response?.data
   const novo = new Error(mensagemDeErro(erro, textos))
 
@@ -55,6 +37,5 @@ export function traduzirErro(erro, textos = {}) {
   novo.status = erro?.response?.status ?? null
   novo.codigo = dados && typeof dados === 'object' ? dados.codigo ?? null : null
   novo.dados = dados && typeof dados === 'object' ? dados : null
-
   return novo
 }

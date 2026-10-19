@@ -3,13 +3,17 @@ import EspelhosViews from '../views/Espelhos/EspelhosViews.vue'
 import CriarEspelhoView from '../views/Espelhos/CriarEspelhoView.vue'
 import FaturasViews from '../views/Faturas/FaturasViews.vue'
 import MinhasGuiasView from '../views/Guias/MinhasGuiasView.vue'
+import AtendimentoView from '../views/Atendimentos/AtendimentoView.vue'
+import PreGuiasView from '../views/PreGuias/PreGuiasView.vue'
 
 const routes = [
   { path: '/', redirect: '/espelhos' },
   { path: '/espelhos', name: 'espelhos', component: EspelhosViews },
   { path: '/espelhos/novo', name: 'espelhos-novo', component: CriarEspelhoView },
   { path: '/faturas', name: 'faturas', component: FaturasViews },
-  { path: '/minhas-guias', name: 'minhas-guias', component: MinhasGuiasView }
+  { path: '/minhas-guias', name: 'minhas-guias', component: MinhasGuiasView },
+  { path: '/atendimento', name: 'atendimento', component: AtendimentoView },
+  { path: '/pre-guias', name: 'pre-guias', component: PreGuiasView }
 ]
 
 const router = createRouter({
