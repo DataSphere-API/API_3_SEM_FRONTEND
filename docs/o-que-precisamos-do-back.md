@@ -1,6 +1,6 @@
 # O que o front precisa do back para entregar o escopo da Sprint
 
-> **Sprint 3:** o plano para ligar no back está em [`integracao-sprint3.md`](integracao-sprint3.md). Ele
+> **Sprint 3:** o plano para ligar no back está em [`integracao-sprint3.md`](integracao-sprint3.md) (detalhes em [`integracao-sprint3-detalhes.md`](integracao-sprint3-detalhes.md)). Ele
 > deixa os itens 5 (check mútuo), 7 (auditor) e 8 (fatura mensal) **mais leves para o back**: o front se
 > adapta ao que o `dev` já tem. Quando os dois documentos discordarem, vale o da Sprint 3.
 
