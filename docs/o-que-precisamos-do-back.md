@@ -12,12 +12,13 @@ Erros sempre no formato da US000-12: `{ "codigo": "...", "mensagem": "..." }`. A
 
 ## Resumo para o time
 
-- **Banco:** **2 colunas novas** (`Sessao_Procedimento.Data_Confirmacao` e `Espelho.Motivo_Reprovacao`) e **soltar a
-  trava de 1 atendimento por espelho** (`Espelho.Atendimento_ID`), porque o espelho junta vários atendimentos.
+- **Banco: só 1 coluna nova** — `Espelho.Motivo_Reprovacao`. O resto usa tabelas e colunas que já
+  existem (check mútuo pelo `Guia_Proc.Status`, espelho com vários atendimentos pelo `Espelho_Item`).
 - **Ajustar issues existentes:** #41 (contrato do login), #75 e #76 (campos a mais no DTO),
-  **#77 (aprovação dupla: médico + chefe)**, #72 e #92 (check mútuo), **US001-4 (espelho com vários atendimentos)**.
+  **#77 (aprovação dupla: médico + chefe)**, #72 e #92 (check mútuo), **US001-4 e US001-5 (espelho com
+  vários atendimentos, correção e reenvio)**.
 - **Criar issues novas:** autocadastro, usuários, OCS, procedimentos (listar e cadastrar), contratos, médicos, busca de
-  beneficiários, criar/editar pré-guia, confirmar/recusar sessão, aprovar/reprovar espelho.
+  beneficiários, criar/editar pré-guia, confirmar/recusar atendimento, aprovar/reprovar e reenviar espelho.
 
 ## Como testar o front sem o back
 
@@ -35,7 +36,7 @@ exatamente os contratos abaixo e servem de referência para o back.
 
 Militares da equipe também são beneficiários (ver item 1), então escolhem o perfil depois de entrar.
 Autocadastro: Prec-CP `123456` + nascimento `21/07/1990`. Para zerar os dados, apague a chave
-`fusex-banco-mock-v4` do Local Storage. Para testar o check mútuo, abra a OCS e o beneficiário em duas
+`fusex-banco-mock-v5` do Local Storage. Para testar o check mútuo, abra a OCS e o beneficiário em duas
 abas do mesmo navegador (cada aba tem o seu login).
 
 ---
@@ -110,65 +111,63 @@ dele já sai registrada. **Banco: nada** — a V8 (PR #23) já tem `Med_ID`/`Che
 Ficou fora das telas (não tem coluna): CID-10, caráter, justificativa clínica, observações do emissor,
 médico externo e o "devolver" (ficou só aprovar/reprovar, como na reunião).
 
-## 5. Check mútuo (OCS ↔ beneficiário)
+## 5. Check mútuo (OCS ↔ beneficiário) — sem mudança no banco
 
 A OCS clica em "Realizar procedimento", o beneficiário confirma no app, e só então a sessão conta.
-Aproveita a **US004-6 (#72)**, que já registra sessões em `Sessao_Procedimento`.
+O pedido da OCS fica no **status do `Guia_Proc`** (`AGUARDANDO_CONFIRMACAO`, a coluna `Status VARCHAR(30)`
+já existe). A linha em `Sessao_Procedimento` (US004-6) só é gravada quando o beneficiário confirma.
 
 | | O quê | Issue |
 |---|---|---|
-| 🔧 | `GET /ocs/{cnpj}/atendimentos` → `[{ atendimentoId, guiaId, beneficiario { precCp, nome }, procedimento, ocs { cnpj, nome }, qtdAutorizada, qtdRealizada, statusProcedimento, dataValidade, sessaoPendente: { id, numeroSessao, dataRealizacao } \| null }]` | #92 |
-| 🔧 | `POST /atendimentos/{id}/sessoes` com `{ cnpj }` — a sessão nasce **aguardando confirmação**. Se já tem uma pendente: 409 `SESSAO_AGUARDANDO_CONFIRMACAO` | #72 |
-| 🔧 | `qtdRealizada` conta **só sessões confirmadas** | #72, #64 |
-| 🆕 | `DELETE /atendimentos/{id}/sessoes/{sessaoId}` — a OCS cancela um pedido pendente | — |
-| 🆕 | `GET /beneficiarios/{precCp}/sessoes-pendentes` → `[{ sessaoId, atendimentoId, numeroSessao, qtdAutorizada, procedimento, ocs { nome }, guiaNumero, dataRealizacao }]` | — |
-| 🆕 | `PATCH /sessoes/{id}/confirmar` — grava a confirmação; na última sessão o procedimento vira `REALIZADA` (reaproveita o recálculo da US004-3) e grava o histórico. Devolve o atendimento | — |
-| 🆕 | `PATCH /sessoes/{id}/recusar` — "não fui atendido": apaga a sessão pendente (a numeração continua sem buracos) | — |
+| 🔧 | `GET /ocs/{cnpj}/atendimentos` → `[{ atendimentoId, guiaId, beneficiario { precCp, nome }, procedimento, ocs { cnpj, nome }, qtdAutorizada, qtdRealizada, statusProcedimento, aguardandoConfirmacao, dataValidade, dataRealizacao, espelhoId }]`. `dataRealizacao` = data da última sessão; `espelhoId` = espelho em que o atendimento já está, ou `null` | #92 |
+| 🔧 | `POST /atendimentos/{id}/sessoes` com `{ cnpj }` — **não grava a sessão ainda**: só muda o `Guia_Proc.Status` para `AGUARDANDO_CONFIRMACAO`. Mantém as validações da #72 (OCS do contrato, validade, saldo). Já aguardando: 409 `AGUARDANDO_CONFIRMACAO` | #72 |
+| 🆕 | `DELETE /atendimentos/{id}/pedido-confirmacao` — a OCS desfaz o pedido (status volta ao anterior) | — |
+| 🆕 | `GET /beneficiarios/{precCp}/confirmacoes-pendentes` → `[{ atendimentoId, numeroSessao, qtdAutorizada, procedimento, ocs { nome }, guiaNumero }]` | — |
+| 🆕 | `PATCH /atendimentos/{id}/confirmar` — **grava a linha em `Sessao_Procedimento`** (a lógica de numeração da #72 vem para cá) e recalcula: `EM_ANDAMENTO`, ou `REALIZADA` na última sessão (recálculo da US004-3). Grava o histórico | #72 |
+| 🆕 | `PATCH /atendimentos/{id}/recusar` — "não fui atendido": nada é gravado, o status volta ao anterior | — |
 
-```sql
-ALTER TABLE Sessao_Procedimento ADD COLUMN Data_Confirmacao TIMESTAMP; -- nula = aguardando o beneficiário
-```
+O status anterior sai da contagem de sessões: 0 → `PENDENTE`, senão `EM_ANDAMENTO`. A baixa por QR
+(US004-3) deixa de ser necessária. O "Minhas guias" usa o `GET /beneficiarios/{precCp}/guias` (#64).
 
-A baixa por QR (US004-3) deixa de ser necessária para o fluxo. O "Minhas guias" do beneficiário usa o
-`GET /beneficiarios/{precCp}/guias` (#64) com o Prec-CP do login.
+## 6. Espelho: vários atendimentos de um período (OCS) — sem mudança no banco
 
-## 6. Espelho: vários atendimentos de um período (OCS)
-
-O espelho é a junção dos atendimentos realizados pela OCS no mês (ou no período que ela escolher).
-Cada item é um atendimento, com o valor que a OCS cobra. A tabela `Espelho_Item` já tem `Atendimento_ID`.
+O espelho é a junção dos atendimentos realizados pela OCS no período que ela escolher. Cada item
+(`Espelho_Item`, que já tem `Atendimento_ID`) é um atendimento, com o valor que a OCS cobra.
 
 | | O quê | Issue |
 |---|---|---|
-| 🔧 | `GET /ocs/{cnpj}/atendimentos` — acrescentar `dataRealizacao` (data da última sessão confirmada) e `espelhoId` (espelho não reprovado em que o atendimento já está, ou `null`) | #92 |
-| 🔧 | `POST /espelhos` passa a receber `{ ocsId, dataInicio, dataFim, itens: [{ atendimentoId, valor }] }`. O back preenche `beneficiarioId` e `descricao` (nome do procedimento) pelo atendimento. Regras: atendimento da OCS e `REALIZADA` (422 `ATENDIMENTO_NAO_REALIZADO`), realizado dentro do período (422 `FORA_DO_PERIODO`), fora de outro espelho não reprovado (409 `ATENDIMENTO_JA_EM_ESPELHO`), valor > 0 (400 `VALOR_INVALIDO`) | US001-4 |
+| 🔧 | `POST /espelhos` com `{ ocsId, dataInicio, dataFim, itens: [{ atendimentoId, valor }] }`. O back preenche `beneficiarioId` e `descricao` (nome do procedimento). Regras: atendimento da OCS e `REALIZADA` (422 `ATENDIMENTO_NAO_REALIZADO`), realizado no período (422 `FORA_DO_PERIODO`), fora de outro espelho (409 `ATENDIMENTO_JA_EM_ESPELHO`), valor > 0 (400 `VALOR_INVALIDO`). **`Espelho.Atendimento_ID` (que é `NOT NULL` e `UNIQUE`) recebe o primeiro atendimento da lista** — como cada atendimento só entra em um espelho, a trava continua valendo | US001-4 |
 | ✅ | `GET /espelhos?cnpj=` — a OCS só vê os dela | US001-5 |
 
-```sql
--- O espelho deixa de ser de um atendimento só: o vínculo fica em Espelho_Item.Atendimento_ID.
-ALTER TABLE Espelho DROP CONSTRAINT uq_espelho_atendimento;
-ALTER TABLE Espelho ALTER COLUMN Atendimento_ID DROP NOT NULL;
-```
-Espelho reprovado libera os atendimentos para a OCS mandar de novo num espelho corrigido.
+**Correção e reenvio pela OCS** — o espelho reprovado volta para a OCS, que corrige **o mesmo
+espelho** (não cria outro, e por isso o `UNIQUE` não atrapalha) e reenvia:
+
+| | O quê | Issue |
+|---|---|---|
+| 🔧 | `PATCH /espelhos/{id}/itens/{itemId}` com `{ valor }` e `DELETE /espelhos/{id}/itens/{itemId}` — liberar quando o espelho está `REPROVADO`. Ao tirar o item cujo atendimento está em `Espelho.Atendimento_ID`, trocar pelo de outro item. Não deixar o espelho sem itens (422 `ESPELHO_SEM_ITENS`) | US001-5 |
+| 🆕 | `POST /espelhos/{id}/reenviar` — `REPROVADO` → `EM_ABERTO`, grava no histórico com origem `reenvio-pela-ocs`. Erro 409 `ESPELHO_NAO_REPROVADO` | — |
+| 🔧 | No `EspelhoResumoResponse`, acrescentar `devolucoes` = quantas vezes o histórico tem o espelho indo para `REPROVADO`. É a **sinalização de devolução** que o auditor vê ("Reenviado após devolução") | US000-14 |
 
 ## 7. Auditor
 
 | | O quê | Issue |
 |---|---|---|
 | ✅ | `GET /espelhos` (receber) | US001-5 |
-| 🔧 | `GET /espelhos/{id}/itens` — voltar a mandar `atendimentoId` (a US000-14 tirou) e acrescentar `valorContratado` (contrato do procedimento com a OCS; o back já tem `obterValorContratado`, US001-2). `null` quando não há contrato | US000-14 |
+| 🔧 | `GET /espelhos/{id}/itens` — voltar a mandar `atendimentoId` (a US000-14 tirou) e acrescentar `valorContratado` (o back já tem `obterValorContratado`, US001-2; `null` sem contrato) | US000-14 |
 | 🔧 | Acrescentar `motivoReprovacao` no `EspelhoResumoResponse` | US000-14 |
-| 🆕 | `PATCH /espelhos/{id}/aprovar` e `PATCH /espelhos/{id}/reprovar` com `{ motivo }` → status `APROVADO` / `REPROVADO`, grava o histórico. Erros: 409 `ESPELHO_JA_AUDITADO`, 400 `MOTIVO_OBRIGATORIO` | — |
+| 🆕 | `PATCH /espelhos/{id}/aprovar` e `PATCH /espelhos/{id}/reprovar` com `{ motivo }` → status `APROVADO` / `REPROVADO` (só no enum `StatusEspelho`; a coluna `Status VARCHAR(20)` já comporta). Grava o histórico. Erros: 409 `ESPELHO_JA_AUDITADO`, 400 `MOTIVO_OBRIGATORIO` | — |
 | ✅ | `GET /guias/{id}/historico` (o `id` é do Guia_Proc = atendimento) e `GET /espelhos/{id}/historico` | US001-3 |
 
 **Pontuação (calculada no front, não precisa de back):** para cada atendimento, 100 quando o valor
 cobrado está dentro do contrato; cai 1 ponto por ponto percentual acima; sem contrato vale 0. A faixa
-usa os limites da US002-2 (baixa até 5%, média até 15%, alta acima). A pontuação do espelho é a média
-dos atendimentos.
+usa os limites da US002-2 (baixa até 5%, média até 15%, alta acima). A pontuação do espelho é a média.
 
+**A única coluna nova do pacote todo:**
 ```sql
 ALTER TABLE Espelho ADD COLUMN Motivo_Reprovacao VARCHAR(255);
 ```
-Os status `APROVADO` e `REPROVADO` entram só no enum `StatusEspelho` (a coluna `Status VARCHAR(20)` já comporta).
+É um `ADD COLUMN` que aceita nulo: não mexe em nenhum dado existente. O cuidado é só com o **número
+da migration**, que deve ser o próximo depois que o time resolver as V7/V8/V10 duplicadas.
 
 ## Ainda no front, fora deste pacote
 
