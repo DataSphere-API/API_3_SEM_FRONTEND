@@ -2,7 +2,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { listarConfirmacoesPendentes, confirmarSessao, recusarSessao } from '../../services/checkMutuoService.js'
 import { sessao } from '../../stores/sessao.js'
-import { formatarDataHora } from '../../utils/documentos.js'
 
 const ATUALIZAR_A_CADA_MS = 8000
 
@@ -31,9 +30,9 @@ async function carregar(silencioso = false) {
 async function confirmar(item) {
   aviso.value = ''
   erroAcao.value = ''
-  processando.value = item.sessaoId
+  processando.value = item.atendimentoId
   try {
-    const atendimento = await confirmarSessao(item.sessaoId)
+    const atendimento = await confirmarSessao(item.atendimentoId)
     aviso.value =
       atendimento.statusProcedimento === 'REALIZADA'
         ? `${item.procedimento} confirmado. Procedimento concluído.`
@@ -49,9 +48,9 @@ async function confirmar(item) {
 async function recusar(item) {
   aviso.value = ''
   erroAcao.value = ''
-  processando.value = item.sessaoId
+  processando.value = item.atendimentoId
   try {
-    await recusarSessao(item.sessaoId)
+    await recusarSessao(item.atendimentoId)
     aviso.value = `Você informou que não foi atendido em ${item.procedimento}. A clínica foi avisada.`
     recusando.value = null
     await carregar(true)
@@ -94,19 +93,18 @@ onUnmounted(() => clearInterval(temporizador))
         </p>
 
         <ul class="fx-lista">
-          <li v-for="item in pendentes" :key="item.sessaoId" class="fx-cartao">
+          <li v-for="item in pendentes" :key="item.atendimentoId" class="fx-cartao">
             <p class="pergunta">
               <strong>{{ item.ocs.nome }}</strong> informou que realizou
               <strong>{{ item.procedimento }}</strong>
-              <template v-if="item.qtdAutorizada > 1"> (sessão {{ item.numeroSessao }} de {{ item.qtdAutorizada }})</template>
-              em {{ formatarDataHora(item.dataRealizacao) }}.
+              <template v-if="item.qtdAutorizada > 1"> (sessão {{ item.numeroSessao }} de {{ item.qtdAutorizada }})</template>.
             </p>
             <p class="fx-suave">Guia <span class="fx-mono">{{ item.guiaNumero }}</span></p>
 
-            <div v-if="recusando === item.sessaoId" class="fx-alerta fx-alerta-ambar confirmar-recusa">
+            <div v-if="recusando === item.atendimentoId" class="fx-alerta fx-alerta-ambar confirmar-recusa">
               <span>Confirma que <strong>não</strong> foi atendido? A sessão não será contada.</span>
               <div class="fx-acoes">
-                <button type="button" class="fx-botao-secundario fx-botao-perigo" :disabled="processando === item.sessaoId" @click="recusar(item)">
+                <button type="button" class="fx-botao-secundario fx-botao-perigo" :disabled="processando === item.atendimentoId" @click="recusar(item)">
                   Sim, não fui atendido
                 </button>
                 <button type="button" class="fx-botao-secundario" @click="recusando = null">Voltar</button>
@@ -114,10 +112,10 @@ onUnmounted(() => clearInterval(temporizador))
             </div>
 
             <div v-else class="fx-acoes">
-              <button type="button" class="fx-botao" :disabled="processando === item.sessaoId" @click="confirmar(item)">
-                {{ processando === item.sessaoId ? 'Confirmando...' : 'Confirmar atendimento' }}
+              <button type="button" class="fx-botao" :disabled="processando === item.atendimentoId" @click="confirmar(item)">
+                {{ processando === item.atendimentoId ? 'Confirmando...' : 'Confirmar atendimento' }}
               </button>
-              <button type="button" class="fx-botao-secundario" :disabled="processando === item.sessaoId" @click="recusando = item.sessaoId">
+              <button type="button" class="fx-botao-secundario" :disabled="processando === item.atendimentoId" @click="recusando = item.atendimentoId">
                 Não fui atendido
               </button>
             </div>

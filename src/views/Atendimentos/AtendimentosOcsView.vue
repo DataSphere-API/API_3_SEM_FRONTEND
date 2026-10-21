@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { listarAtendimentosDaOcs, registrarSessao, cancelarSessao } from '../../services/checkMutuoService.js'
 import { sessao } from '../../stores/sessao.js'
-import { formatarData, formatarDataHora } from '../../utils/documentos.js'
+import { formatarData } from '../../utils/documentos.js'
 
 const ATUALIZAR_A_CADA_MS = 8000
 
@@ -28,8 +28,8 @@ const lista = computed(() => {
   const termo = busca.value.trim().toLowerCase()
   return atendimentos.value
     .filter(a => {
-      if (filtro.value === 'ABERTOS') return a.statusProcedimento !== 'REALIZADA' && !a.sessaoPendente
-      if (filtro.value === 'AGUARDANDO') return Boolean(a.sessaoPendente)
+      if (filtro.value === 'ABERTOS') return a.statusProcedimento !== 'REALIZADA' && !a.aguardandoConfirmacao
+      if (filtro.value === 'AGUARDANDO') return a.aguardandoConfirmacao
       if (filtro.value === 'REALIZADA') return a.statusProcedimento === 'REALIZADA'
       return true
     })
@@ -42,7 +42,7 @@ const lista = computed(() => {
     )
 })
 
-const aguardando = computed(() => atendimentos.value.filter(a => a.sessaoPendente).length)
+const aguardando = computed(() => atendimentos.value.filter(a => a.aguardandoConfirmacao).length)
 
 async function carregar(silencioso = false) {
   if (!silencioso) carregando.value = true
@@ -76,7 +76,7 @@ async function cancelar(atendimento) {
   erroAcao.value = ''
   processando.value = atendimento.atendimentoId
   try {
-    await cancelarSessao(atendimento.atendimentoId, atendimento.sessaoPendente.id)
+    await cancelarSessao(atendimento.atendimentoId)
     aviso.value = 'Pedido de confirmação cancelado.'
     await carregar(true)
   } catch (e) {
@@ -88,7 +88,7 @@ async function cancelar(atendimento) {
 
 function situacao(a) {
   if (a.statusProcedimento === 'REALIZADA') return { texto: 'Realizado', classe: 'fx-selo-verde' }
-  if (a.sessaoPendente) return { texto: 'Aguardando beneficiário', classe: 'fx-selo-ambar' }
+  if (a.aguardandoConfirmacao) return { texto: 'Aguardando beneficiário', classe: 'fx-selo-ambar' }
   if (a.qtdRealizada > 0) return { texto: 'Em andamento', classe: 'fx-selo-azul' }
   return { texto: 'A realizar', classe: 'fx-selo-cinza' }
 }
@@ -173,14 +173,15 @@ onUnmounted(() => clearInterval(temporizador))
               </div>
             </div>
 
-            <p v-if="a.sessaoPendente" class="fx-alerta fx-alerta-ambar">
-              Sessão {{ a.sessaoPendente.numeroSessao }} registrada em {{ formatarDataHora(a.sessaoPendente.dataRealizacao) }}.
+            <p v-if="a.aguardandoConfirmacao" class="fx-alerta fx-alerta-ambar">
+              <template v-if="a.qtdAutorizada > 1">Sessão {{ a.qtdRealizada + 1 }} registrada.</template>
+              <template v-else>Procedimento registrado.</template>
               Aguardando o beneficiário confirmar no app.
             </p>
 
             <div v-if="a.statusProcedimento !== 'REALIZADA'" class="fx-acoes rodape">
               <button
-                v-if="!a.sessaoPendente"
+                v-if="!a.aguardandoConfirmacao"
                 type="button"
                 class="fx-botao"
                 :disabled="processando === a.atendimentoId"

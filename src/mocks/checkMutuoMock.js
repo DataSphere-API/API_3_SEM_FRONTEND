@@ -1,3 +1,5 @@
+// Check mútuo sem coluna nova no banco: o pedido da OCS vira o status AGUARDANDO_CONFIRMACAO do
+// Guia_Proc, e a linha em Sessao_Procedimento só é gravada quando o beneficiário confirma.
 import { banco, persistir, proximoId, copiar, registrarHistorico } from './bancoMock.js'
 import { erroHttp, esperar } from './auxiliares.js'
 import { sessao } from '../stores/sessao.js'
@@ -7,13 +9,15 @@ function hoje() {
   return new Date().toISOString().slice(0, 10)
 }
 
-// Espelho em que o atendimento já foi cobrado. Espelho reprovado libera o atendimento para reenvio.
-function espelhoAtivoDo(atendimentoId) {
-  const db = banco()
-  const item = db.espelhoItens.find(
-    i => i.atendimentoId === atendimentoId && db.espelhos.find(e => e.id === i.espelhoId)?.status !== 'REPROVADO'
-  )
-  return item ? item.espelhoId : null
+// Espelho em que o atendimento já está (um espelho devolvido continua com os atendimentos dele).
+function espelhoDo(atendimentoId) {
+  return banco().espelhoItens.find(i => i.atendimentoId === atendimentoId)?.espelhoId ?? null
+}
+
+function procedimentoDo(atendimentoId) {
+  return banco()
+    .preGuias.flatMap(p => p.procedimentos)
+    .find(p => p.atendimentoId === Number(atendimentoId))
 }
 
 // Monta a visão de cada procedimento de guia emitida, como o GET /ocs/{cnpj}/atendimentos devolveria.
@@ -24,13 +28,12 @@ export function atendimentos() {
     .flatMap(guia =>
       guia.procedimentos.map(p => {
         const sessoes = db.sessoes.filter(s => s.atendimentoId === p.atendimentoId)
-        const confirmadas = sessoes.filter(s => s.dataConfirmacao)
-        const pendente = sessoes.find(s => !s.dataConfirmacao) || null
         const ocs = db.ocs.find(o => o.cnpj === p.ocsCnpj)
         const beneficiario = db.beneficiarios.find(b => b.precCp === guia.beneficiarioPrecCp)
         let statusProcedimento = 'PENDENTE'
-        if (confirmadas.length >= p.quantidade) statusProcedimento = 'REALIZADA'
-        else if (confirmadas.length > 0 || pendente) statusProcedimento = 'EM_ANDAMENTO'
+        if (sessoes.length >= p.quantidade) statusProcedimento = 'REALIZADA'
+        else if (p.aguardandoConfirmacao) statusProcedimento = 'AGUARDANDO_CONFIRMACAO'
+        else if (sessoes.length > 0) statusProcedimento = 'EM_ANDAMENTO'
         return {
           atendimentoId: p.atendimentoId,
           guiaId: guia.id,
@@ -39,15 +42,13 @@ export function atendimentos() {
           procedimento: db.procedimentos.find(x => x.id === p.procedimentoId)?.nome || '—',
           ocs: { cnpj: p.ocsCnpj, nome: ocs?.nome || '—' },
           qtdAutorizada: p.quantidade,
-          qtdRealizada: confirmadas.length,
+          qtdRealizada: sessoes.length,
           statusProcedimento,
+          aguardandoConfirmacao: Boolean(p.aguardandoConfirmacao),
           dataValidade: somarDias(guia.dataEmissao, VALIDADE_DIAS),
           // Data da última sessão confirmada: é ela que define em que período o atendimento entra no espelho.
-          dataRealizacao: confirmadas.length ? confirmadas[confirmadas.length - 1].dataConfirmacao : null,
-          espelhoId: espelhoAtivoDo(p.atendimentoId),
-          sessaoPendente: pendente
-            ? { id: pendente.id, numeroSessao: pendente.numeroSessao, dataRealizacao: pendente.dataRealizacao }
-            : null
+          dataRealizacao: sessoes.length ? sessoes[sessoes.length - 1].dataRealizacao : null,
+          espelhoId: espelhoDo(p.atendimentoId)
         }
       })
     )
@@ -61,19 +62,20 @@ function encontrarAtendimento(atendimentoId) {
   return atendimento
 }
 
-function encontrarSessaoPendente(sessaoId) {
-  const sessaoRegistro = banco().sessoes.find(s => s.id === Number(sessaoId))
-  if (!sessaoRegistro || sessaoRegistro.dataConfirmacao) {
-    throw erroHttp(404, { codigo: 'SESSAO_NAO_ENCONTRADA', mensagem: 'Este pedido de confirmação não existe mais.' })
+function exigirPedido(atendimento) {
+  if (!atendimento.aguardandoConfirmacao) {
+    throw erroHttp(409, { codigo: 'SEM_PEDIDO_DE_CONFIRMACAO', mensagem: 'Este atendimento não está aguardando confirmação.' })
   }
-  return sessaoRegistro
 }
+
+// ---------- OCS ----------
 
 export async function mockListarAtendimentosOcs(cnpj) {
   await esperar(300)
   return copiar(atendimentos().filter(a => a.ocs.cnpj === cnpj))
 }
 
+// POST /atendimentos/{id}/sessoes: a OCS avisa que fez o procedimento.
 export async function mockRegistrarSessao(atendimentoId, cnpj) {
   await esperar(400)
   const atendimento = encontrarAtendimento(atendimentoId)
@@ -83,86 +85,80 @@ export async function mockRegistrarSessao(atendimentoId, cnpj) {
   if (atendimento.dataValidade < hoje()) {
     throw erroHttp(422, { codigo: 'GUIA_EXPIRADA', mensagem: 'A guia está vencida.' })
   }
-  if (atendimento.sessaoPendente) {
-    throw erroHttp(409, {
-      codigo: 'SESSAO_AGUARDANDO_CONFIRMACAO',
-      mensagem: 'Já existe uma sessão aguardando a confirmação do beneficiário.'
-    })
+  if (atendimento.aguardandoConfirmacao) {
+    throw erroHttp(409, { codigo: 'AGUARDANDO_CONFIRMACAO', mensagem: 'Já existe um pedido aguardando a confirmação do beneficiário.' })
   }
   if (atendimento.qtdRealizada >= atendimento.qtdAutorizada) {
     throw erroHttp(422, { codigo: 'SESSOES_ESGOTADAS', mensagem: 'Todas as sessões autorizadas já foram realizadas.' })
   }
-  const db = banco()
-  const nova = {
-    id: proximoId(db.sessoes),
-    atendimentoId: atendimento.atendimentoId,
-    numeroSessao: atendimento.qtdRealizada + 1,
-    ocsCnpj: cnpj,
-    dataRealizacao: new Date().toISOString(),
-    dataConfirmacao: null
-  }
-  db.sessoes.push(nova)
+  procedimentoDo(atendimentoId).aguardandoConfirmacao = true
   persistir()
   return copiar(encontrarAtendimento(atendimentoId))
 }
 
-export async function mockCancelarSessao(atendimentoId, sessaoId) {
+// DELETE /atendimentos/{id}/pedido-confirmacao: a OCS desfaz o pedido.
+export async function mockCancelarSessao(atendimentoId) {
   await esperar(300)
-  const pendente = encontrarSessaoPendente(sessaoId)
-  if (pendente.atendimentoId !== Number(atendimentoId)) {
-    throw erroHttp(404, { codigo: 'SESSAO_NAO_ENCONTRADA', mensagem: 'Este pedido de confirmação não existe mais.' })
-  }
-  const db = banco()
-  db.sessoes = db.sessoes.filter(s => s.id !== pendente.id)
+  exigirPedido(encontrarAtendimento(atendimentoId))
+  procedimentoDo(atendimentoId).aguardandoConfirmacao = false
   persistir()
 }
+
+// ---------- Beneficiário ----------
 
 export async function mockListarConfirmacoesPendentes(precCp) {
   await esperar(300)
   return copiar(
     atendimentos()
-      .filter(a => a.beneficiario.precCp === precCp && a.sessaoPendente)
+      .filter(a => a.beneficiario.precCp === precCp && a.aguardandoConfirmacao)
       .map(a => ({
-        sessaoId: a.sessaoPendente.id,
         atendimentoId: a.atendimentoId,
-        numeroSessao: a.sessaoPendente.numeroSessao,
+        numeroSessao: a.qtdRealizada + 1,
         qtdAutorizada: a.qtdAutorizada,
         procedimento: a.procedimento,
         ocs: a.ocs,
-        guiaNumero: a.guiaNumero,
-        dataRealizacao: a.sessaoPendente.dataRealizacao
+        guiaNumero: a.guiaNumero
       }))
   )
 }
 
-function validarDono(sessaoRegistro) {
-  const atendimento = encontrarAtendimento(sessaoRegistro.atendimentoId)
+function validarDono(atendimento) {
   if (atendimento.beneficiario.precCp !== sessao.usuario?.precCp) {
-    throw erroHttp(403, { codigo: 'SESSAO_DE_OUTRO_BENEFICIARIO', mensagem: 'Este atendimento não é seu.' })
+    throw erroHttp(403, { codigo: 'ATENDIMENTO_DE_OUTRO_BENEFICIARIO', mensagem: 'Este atendimento não é seu.' })
   }
 }
 
-export async function mockConfirmarSessao(sessaoId) {
+// PATCH /atendimentos/{id}/confirmar: grava a sessão e, na última, o procedimento fica REALIZADA.
+export async function mockConfirmarSessao(atendimentoId) {
   await esperar(400)
-  const pendente = encontrarSessaoPendente(sessaoId)
-  validarDono(pendente)
-  const antes = encontrarAtendimento(pendente.atendimentoId)
-  pendente.dataConfirmacao = new Date().toISOString()
-  const depois = encontrarAtendimento(pendente.atendimentoId)
+  const antes = encontrarAtendimento(atendimentoId)
+  validarDono(antes)
+  exigirPedido(antes)
+  const db = banco()
+  db.sessoes.push({
+    id: proximoId(db.sessoes),
+    atendimentoId: antes.atendimentoId,
+    numeroSessao: antes.qtdRealizada + 1,
+    ocsCnpj: antes.ocs.cnpj,
+    dataRealizacao: new Date().toISOString()
+  })
+  procedimentoDo(atendimentoId).aguardandoConfirmacao = false
+  const depois = encontrarAtendimento(atendimentoId)
   const statusAntes = antes.qtdRealizada === 0 ? 'PENDENTE' : 'EM_ANDAMENTO'
-  if (depois.statusProcedimento === 'REALIZADA' || statusAntes === 'PENDENTE') {
-    registrarHistorico('GUIA_PROC', pendente.atendimentoId, statusAntes, depois.statusProcedimento, 'confirmacao-do-beneficiario')
+  if (depois.statusProcedimento !== statusAntes) {
+    registrarHistorico('GUIA_PROC', antes.atendimentoId, statusAntes, depois.statusProcedimento, 'confirmacao-do-beneficiario')
   }
   persistir()
-  return copiar(encontrarAtendimento(pendente.atendimentoId))
+  return copiar(depois)
 }
 
-export async function mockRecusarSessao(sessaoId) {
+// PATCH /atendimentos/{id}/recusar: "não fui atendido". Nada é gravado em Sessao_Procedimento.
+export async function mockRecusarSessao(atendimentoId) {
   await esperar(400)
-  const pendente = encontrarSessaoPendente(sessaoId)
-  validarDono(pendente)
-  const db = banco()
-  db.sessoes = db.sessoes.filter(s => s.id !== pendente.id)
+  const atendimento = encontrarAtendimento(atendimentoId)
+  validarDono(atendimento)
+  exigirPedido(atendimento)
+  procedimentoDo(atendimentoId).aguardandoConfirmacao = false
   persistir()
 }
 

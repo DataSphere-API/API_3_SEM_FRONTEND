@@ -1,6 +1,6 @@
 // Banco em memória dos mocks, no formato das tabelas e issues do back.
 // Fica salvo no localStorage para o fluxo continuar entre abas e logins de perfis diferentes.
-const CHAVE = 'fusex-banco-mock-v4'
+const CHAVE = 'fusex-banco-mock-v5'
 const SENHA_PADRAO = 'fusex123'
 
 const IMAGEM_CENTRO = '12345678000199'
@@ -133,15 +133,16 @@ function semente() {
         motivoReprovacao: 'Procedimento sem indicação clínica no pedido.'
       })
     ],
-    // Sessao_Procedimento + Data_Confirmacao (check mútuo). Nula = aguardando o beneficiário.
+    // Sessao_Procedimento: só sessões já confirmadas pelo beneficiário (check mútuo).
+    // O pedido da OCS que ainda espera o beneficiário fica no status do Guia_Proc (aguardandoConfirmacao).
     sessoes: [
-      { id: 1, atendimentoId: 501, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-17T10:00:00', dataConfirmacao: '2026-10-17T10:04:00' },
-      { id: 2, atendimentoId: 601, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-11T08:30:00', dataConfirmacao: '2026-10-11T08:41:00' },
-      { id: 3, atendimentoId: 602, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-12T15:10:00', dataConfirmacao: '2026-10-12T15:20:00' }
+      { id: 1, atendimentoId: 501, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-17T10:04:00' },
+      { id: 2, atendimentoId: 601, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-11T08:41:00' },
+      { id: 3, atendimentoId: 602, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-12T15:20:00' }
     ],
     // Espelho = todos os atendimentos realizados de uma OCS num período; cada item é um atendimento.
     espelhos: [
-      { id: 1, ocsId: IMAGEM_CENTRO, dataInicio: '2026-10-01', dataFim: '2026-10-15', status: 'EM_ABERTO', dataAtualizacao: null, motivoReprovacao: null }
+      { id: 1, atendimentoId: 601, ocsId: IMAGEM_CENTRO, dataInicio: '2026-10-01', dataFim: '2026-10-15', status: 'EM_ABERTO', dataAtualizacao: null, motivoReprovacao: null }
     ],
     espelhoItens: [
       { id: 1, espelhoId: 1, atendimentoId: 601, beneficiarioId: '1001', descricao: 'Ultrassom · abdome total', valor: 310.0 },

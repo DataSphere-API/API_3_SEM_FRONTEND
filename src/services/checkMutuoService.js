@@ -23,21 +23,21 @@ export async function listarAtendimentosDaOcs(cnpj) {
   }
 }
 
-// OCS avisa que fez o procedimento; a sessão fica aguardando o beneficiário.
+// OCS avisa que fez o procedimento; o atendimento fica AGUARDANDO_CONFIRMACAO do beneficiário.
 export async function registrarSessao(atendimentoId, cnpj) {
   try {
     if (USAR_MOCK) return await mockRegistrarSessao(atendimentoId, cnpj)
     const response = await api.post(`/atendimentos/${atendimentoId}/sessoes`, { cnpj })
     return response.data
   } catch (erro) {
-    throw traduzirErro(erro, { 409: 'Já existe uma sessão aguardando a confirmação do beneficiário.' })
+    throw traduzirErro(erro, { 409: 'Já existe um pedido aguardando a confirmação do beneficiário.' })
   }
 }
 
-export async function cancelarSessao(atendimentoId, sessaoId) {
+export async function cancelarSessao(atendimentoId) {
   try {
-    if (USAR_MOCK) return await mockCancelarSessao(atendimentoId, sessaoId)
-    await api.delete(`/atendimentos/${atendimentoId}/sessoes/${sessaoId}`)
+    if (USAR_MOCK) return await mockCancelarSessao(atendimentoId)
+    await api.delete(`/atendimentos/${atendimentoId}/pedido-confirmacao`)
   } catch (erro) {
     throw traduzirErro(erro)
   }
@@ -48,27 +48,27 @@ export async function cancelarSessao(atendimentoId, sessaoId) {
 export async function listarConfirmacoesPendentes(precCp) {
   try {
     if (USAR_MOCK) return await mockListarConfirmacoesPendentes(precCp)
-    const response = await api.get(`/beneficiarios/${precCp}/sessoes-pendentes`)
+    const response = await api.get(`/beneficiarios/${precCp}/confirmacoes-pendentes`)
     return response.data
   } catch (erro) {
     throw traduzirErro(erro, { 404: 'Beneficiário não encontrado.' })
   }
 }
 
-export async function confirmarSessao(sessaoId) {
+export async function confirmarSessao(atendimentoId) {
   try {
-    if (USAR_MOCK) return await mockConfirmarSessao(sessaoId)
-    const response = await api.patch(`/sessoes/${sessaoId}/confirmar`)
+    if (USAR_MOCK) return await mockConfirmarSessao(atendimentoId)
+    const response = await api.patch(`/atendimentos/${atendimentoId}/confirmar`)
     return response.data
   } catch (erro) {
     throw traduzirErro(erro, { 404: 'Este pedido de confirmação não existe mais.' })
   }
 }
 
-export async function recusarSessao(sessaoId) {
+export async function recusarSessao(atendimentoId) {
   try {
-    if (USAR_MOCK) return await mockRecusarSessao(sessaoId)
-    await api.patch(`/sessoes/${sessaoId}/recusar`)
+    if (USAR_MOCK) return await mockRecusarSessao(atendimentoId)
+    await api.patch(`/atendimentos/${atendimentoId}/recusar`)
   } catch (erro) {
     throw traduzirErro(erro, { 404: 'Este pedido de confirmação não existe mais.' })
   }
