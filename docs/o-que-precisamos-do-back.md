@@ -137,7 +137,7 @@ O espelho é a junção dos atendimentos realizados pela OCS no período que ela
 
 | | O quê | Issue |
 |---|---|---|
-| 🔧 | `POST /espelhos` com `{ ocsId, dataInicio, dataFim, itens: [{ atendimentoId, valor }] }`. O back preenche `beneficiarioId` e `descricao` (nome do procedimento). Regras: atendimento da OCS e `REALIZADA` (422 `ATENDIMENTO_NAO_REALIZADO`), realizado no período (422 `FORA_DO_PERIODO`), **período inteiro dentro do mês atual** (422 `FORA_DO_MES`: o espelho entra na fatura do mês em que é enviado), fora de outro espelho (409 `ATENDIMENTO_JA_EM_ESPELHO`), valor > 0 (400 `VALOR_INVALIDO`). **`Espelho.Atendimento_ID` (que é `NOT NULL` e `UNIQUE`) recebe o primeiro atendimento da lista** — como cada atendimento só entra em um espelho, a trava continua valendo | US001-4 |
+| 🔧 | `POST /espelhos` com `{ ocsId, dataInicio, dataFim, itens: [{ atendimentoId, valor }] }`. O back preenche `beneficiarioId` e `descricao` (nome do procedimento). Regras: atendimento da OCS e `REALIZADA` (422 `ATENDIMENTO_NAO_REALIZADO`), realizado no período (422 `FORA_DO_PERIODO`), **período inteiro dentro de um mês só, que precisa ser o mês atual ou — até o dia 5 — o mês anterior** (422 `FORA_DO_MES`: o espelho entra na fatura do mês dos atendimentos), fora de outro espelho (409 `ATENDIMENTO_JA_EM_ESPELHO`), valor > 0 (400 `VALOR_INVALIDO`). **`Espelho.Atendimento_ID` (que é `NOT NULL` e `UNIQUE`) recebe o primeiro atendimento da lista** — como cada atendimento só entra em um espelho, a trava continua valendo | US001-4 |
 | ✅ | `GET /espelhos?cnpj=` — a OCS só vê os dela | US001-5 |
 
 **Correção e reenvio pela OCS** — o espelho reprovado volta para a OCS, que corrige **o mesmo
@@ -180,10 +180,15 @@ fatura de um espelho nem **regerar**: quem cria e alimenta a fatura é a aprova�
 | 🔧 | Ao aprovar um espelho: procura a fatura `ATIVA` da OCS no mês do espelho; se não existe, cria. Cria um `Item_Fatura` para cada `Espelho_Item` (valor apresentado, valor contratado e divergência, como a US001-6 já faz). `Fatura.Esp_Fat` e `Fatura.Guia_Proc_ID` (`NOT NULL`) ficam com o primeiro espelho/atendimento; os demais entram pelos itens | US001-6 |
 | 🔧 | `GET /faturas?cnpj=&competencia=AAAA-MM` → `[{ id, ocsId, ocsNome, competencia, status, quantidadeEspelhos, quantidadeItens, valorApresentado, valorContratado, espelhosPendentes, dataGeracao, dataEncaminhamento }]`. A `competencia` sai do período dos espelhos da fatura (todos do mesmo mês). `espelhosPendentes` = espelhos da OCS no mês ainda `EM_ABERTO` ou `REPROVADO` | US001-7 |
 | 🔧 | `GET /faturas/{id}` → o resumo + `espelhos: [{ espelhoId, dataInicio, dataFim, itens: [{ id, atendimentoId, descricao, beneficiarioId, valorApresentado, valorContratado, divergenciaValor }] }]` e `pendentes: [{ espelhoId, status }]` | US001-7 |
-| 🔧 | `POST /faturas/{id}/encaminhar` — só depois que o mês acabou (422 `MES_NAO_ENCERRADO`) e sem espelho pendente do mês (422 `AUDITORIA_PENDENTE`). A regra antiga de "item não autorizado" sai: os itens já passaram pelo auditor no espelho | US002-3 |
+| 🔧 | `POST /faturas/{id}/encaminhar` — só depois do prazo de envio dos espelhos do mês, ou seja, a partir do dia 6 do mês seguinte (422 `MES_NAO_ENCERRADO`) e sem espelho pendente do mês (422 `AUDITORIA_PENDENTE`). A regra antiga de "item não autorizado" sai: os itens já passaram pelo auditor no espelho | US002-3 |
 | ❌ | **Tirar** `POST /faturas` (gerar a partir de um espelho) e `POST /faturas/{id}/regerar` do uso — o front não chama mais | US001-6, US001-7 |
 
 Status: `ATIVA` (aberta, recebendo espelhos) → `ENCAMINHADA_APROVACAO`. O `REGERADA` deixa de ser usado.
+
+**Tolerância de 5 dias:** do dia 1 ao dia 5 a OCS ainda pode mandar espelho do mês anterior (que entra
+na fatura daquele mês). Por isso a fatura de um mês só pode ser encaminhada a partir do dia 6 do mês
+seguinte. A constante fica no front em `src/utils/competencia.js` (`DIAS_DE_TOLERANCIA`); o back
+precisa usar o mesmo número.
 
 ## Ainda no front, fora deste pacote
 
