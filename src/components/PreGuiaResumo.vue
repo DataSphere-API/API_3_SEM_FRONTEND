@@ -1,8 +1,9 @@
 <script setup>
 import { formatarMoeda } from '../utils/avaliarLisura.js'
-import { formatarDataHora } from '../utils/documentos.js'
-import { CARATER, seloDecisao, seloStatus } from '../utils/fluxoPreGuia.js'
+import { formatarData, formatarDataHora } from '../utils/documentos.js'
+import { numeroPreGuia, seloAprovacao, seloStatus } from '../utils/fluxoPreGuia.js'
 
+// preGuia no formato do GET /pre-guias/{id} (#76).
 defineProps({
   preGuia: { type: Object, required: true }
 })
@@ -12,10 +13,8 @@ defineProps({
   <section class="resumo">
     <div class="topo">
       <div>
-        <h2 class="fx-mono numero">{{ preGuia.numero }}</h2>
-        <p class="fx-suave">
-          Criada em {{ formatarDataHora(preGuia.criadaEm) }} por {{ preGuia.criadaPor?.nome }}
-        </p>
+        <h2 class="fx-mono numero">{{ numeroPreGuia(preGuia.id) }}</h2>
+        <p class="fx-suave">Criada em {{ formatarData(preGuia.dataCriacao) }}</p>
       </div>
       <span class="fx-selo" :class="seloStatus(preGuia.status).classe">{{ seloStatus(preGuia.status).texto }}</span>
     </div>
@@ -26,30 +25,25 @@ defineProps({
         <dd>{{ preGuia.beneficiario.nome }} <span class="fx-suave fx-mono">· Prec-CP {{ preGuia.beneficiario.precCp }}</span></dd>
       </div>
       <div>
-        <dt>Médico solicitante</dt>
-        <dd>{{ preGuia.medicoSolicitante.nome }} <span class="fx-suave fx-mono">· CRM {{ preGuia.medicoSolicitante.crm }}/{{ preGuia.medicoSolicitante.uf }}</span></dd>
+        <dt>Médico responsável</dt>
+        <dd>{{ preGuia.medico.nome }} <span class="fx-suave fx-mono">· CRM {{ preGuia.medico.crm || '—' }}</span></dd>
       </div>
-      <div>
-        <dt>CID-10</dt>
-        <dd class="fx-mono">{{ preGuia.cid || 'Não informado' }}</dd>
-      </div>
-      <div>
-        <dt>Caráter</dt>
-        <dd>{{ CARATER[preGuia.carater] || preGuia.carater }}</dd>
-      </div>
-      <div class="largo">
-        <dt>Justificativa clínica</dt>
-        <dd>{{ preGuia.justificativa }}</dd>
-      </div>
-      <div v-if="preGuia.observacoesEmissor" class="largo">
-        <dt>Observações do emissor</dt>
-        <dd>{{ preGuia.observacoesEmissor }}</dd>
-      </div>
-      <div v-if="preGuia.respostaEmissor" class="largo">
-        <dt>Resposta do emissor à devolução</dt>
-        <dd>{{ preGuia.respostaEmissor }}</dd>
+      <div v-if="preGuia.dataEmissao">
+        <dt>Emissão</dt>
+        <dd>{{ formatarData(preGuia.dataEmissao) }} · válida até {{ formatarData(preGuia.validoAte) }}</dd>
       </div>
     </dl>
+
+    <p v-if="preGuia.status === 'REPROVADA'" class="fx-alerta fx-alerta-vermelho">
+      <strong>Reprovada:</strong> {{ preGuia.motivoReprovacao }}
+    </p>
+
+    <div v-if="preGuia.validacao?.pendencias?.length" class="fx-alerta fx-alerta-vermelho">
+      <strong>Pendências da validação</strong>
+      <ul class="pendencias">
+        <li v-for="(p, i) in preGuia.validacao.pendencias" :key="i">{{ p.mensagem }}</li>
+      </ul>
+    </div>
 
     <div class="fx-tabela-rolagem">
       <table class="fx-tabela">
@@ -63,10 +57,10 @@ defineProps({
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in preGuia.procedimentos" :key="`${p.procedimentoId}-${p.ocs.cnpj}`">
+          <tr v-for="p in preGuia.procedimentos" :key="p.atendimentoId">
             <td>{{ p.nome }}</td>
             <td>{{ p.ocs.nome }}</td>
-            <td class="fx-mono">{{ p.quantidade }}</td>
+            <td class="fx-mono">{{ p.qtdSessoes }}</td>
             <td class="fx-mono">{{ formatarMoeda(p.valorUnitario) }}</td>
             <td class="fx-mono">{{ formatarMoeda(p.valorTotal) }}</td>
           </tr>
@@ -81,18 +75,19 @@ defineProps({
     <div class="decisoes">
       <div
         v-for="item in [
-          { quem: 'Médico', ...preGuia.aprovacaoMedico },
-          { quem: 'Chefe do FUSEx', ...preGuia.aprovacaoChefe }
+          { quem: 'Médico', data: preGuia.dataAprovacaoMedico },
+          { quem: 'Chefe do FUSEx', data: preGuia.dataAprovacaoChefe }
         ]"
         :key="item.quem"
         class="decisao"
       >
-        <div class="decisao-topo">
-          <strong>{{ item.quem }}</strong>
-          <span class="fx-selo" :class="seloDecisao(item.decisao).classe">{{ seloDecisao(item.decisao).texto }}</span>
-        </div>
-        <p v-if="item.por" class="fx-suave">{{ item.por }} · {{ formatarDataHora(item.data) }}</p>
-        <p v-if="item.observacao" class="observacao">“{{ item.observacao }}”</p>
+        <strong>{{ item.quem }}</strong>
+        <span>
+          <span class="fx-selo" :class="seloAprovacao(preGuia.status, Boolean(item.data)).classe">
+            {{ seloAprovacao(preGuia.status, Boolean(item.data)).texto }}
+          </span>
+          <span v-if="item.data" class="fx-suave"> {{ formatarDataHora(item.data) }}</span>
+        </span>
       </div>
     </div>
   </section>
@@ -129,10 +124,6 @@ defineProps({
   gap: 0.75rem 1.25rem;
 }
 
-.dados .largo {
-  grid-column: 1 / -1;
-}
-
 .dados dt {
   font-size: 0.8rem;
   color: var(--fx-texto-suave);
@@ -141,6 +132,11 @@ defineProps({
 .dados dd {
   margin: 0.2rem 0 0;
   line-height: 1.45;
+}
+
+.pendencias {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
 }
 
 .decisoes {
@@ -152,24 +148,12 @@ defineProps({
 .decisao {
   flex: 1 1 240px;
   padding: 0.75rem 0.9rem;
-  border: 1px solid var(--fx-borda);
-  border-radius: 10px;
-  background-color: #fafbf8;
-}
-
-.decisao-topo {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
-}
-
-.decisao p {
-  margin: 0.4rem 0 0;
-}
-
-.observacao {
-  font-size: 0.9rem;
-  line-height: 1.4;
+  border: 1px solid var(--fx-borda);
+  border-radius: 10px;
+  background-color: #fafbf8;
 }
 </style>
