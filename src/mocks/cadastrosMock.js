@@ -108,6 +108,18 @@ export async function mockListarProcedimentos() {
   return copiar(banco().procedimentos)
 }
 
+export async function mockCriarProcedimento({ nome }) {
+  await esperar(300)
+  const db = banco()
+  if (db.procedimentos.some(p => p.nome.toLowerCase() === nome.toLowerCase())) {
+    throw erroHttp(409, { codigo: 'PROCEDIMENTO_JA_CADASTRADO', mensagem: 'Já existe um procedimento com esse nome.' })
+  }
+  const procedimento = { id: proximoId(db.procedimentos), nome }
+  db.procedimentos.push(procedimento)
+  persistir()
+  return copiar(procedimento)
+}
+
 function contratoDetalhado(contrato) {
   const db = banco()
   return {

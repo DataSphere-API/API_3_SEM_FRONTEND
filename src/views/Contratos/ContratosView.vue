@@ -1,6 +1,6 @@
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
-import { listarContratos, criarContrato, listarProcedimentos } from '../../services/contratoService.js'
+import { listarContratos, criarContrato, listarProcedimentos, criarProcedimento } from '../../services/contratoService.js'
 import { listarOcs } from '../../services/ocsService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 
@@ -15,6 +15,9 @@ const errosCampo = ref({})
 const salvando = ref(false)
 const filtroOcs = ref('')
 const form = reactive({ ocsCnpj: '', procedimentoId: '', valor: '' })
+const novoProcedimento = ref('')
+const erroProcedimento = ref('')
+const salvandoProcedimento = ref(false)
 
 const contratosFiltrados = computed(() =>
   filtroOcs.value ? contratos.value.filter(c => c.ocsCnpj === filtroOcs.value) : contratos.value
@@ -67,6 +70,27 @@ async function cadastrar() {
   }
 }
 
+async function cadastrarProcedimento() {
+  aviso.value = ''
+  erroProcedimento.value = ''
+  if (!novoProcedimento.value.trim()) {
+    erroProcedimento.value = 'Informe o nome do procedimento.'
+    return
+  }
+  salvandoProcedimento.value = true
+  try {
+    const procedimento = await criarProcedimento({ nome: novoProcedimento.value.trim() })
+    procedimentos.value = await listarProcedimentos()
+    form.procedimentoId = procedimento.id
+    novoProcedimento.value = ''
+    aviso.value = `Procedimento ${procedimento.nome} cadastrado. Agora informe a OCS e o valor do contrato.`
+  } catch (e) {
+    erroProcedimento.value = e.mensagemUsuario || 'Não foi possível cadastrar o procedimento.'
+  } finally {
+    salvandoProcedimento.value = false
+  }
+}
+
 onMounted(carregar)
 </script>
 
@@ -79,6 +103,21 @@ onMounted(carregar)
           Quanto o FUSEx paga por procedimento em cada OCS. Só procedimentos com contrato entram numa pré-guia.
         </p>
       </header>
+
+      <form class="fx-cartao" novalidate @submit.prevent="cadastrarProcedimento">
+        <h2 class="fx-secao-titulo">Novo procedimento</h2>
+        <p class="fx-suave">Cadastre aqui o exame ou procedimento que ainda não aparece na lista do contrato.</p>
+        <p v-if="erroProcedimento" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroProcedimento }}</p>
+        <div class="linha-procedimento">
+          <label class="fx-campo">
+            Nome do procedimento
+            <input v-model="novoProcedimento" class="fx-entrada" placeholder="Ex.: Ressonância magnética · joelho" />
+          </label>
+          <button type="submit" class="fx-botao-secundario" :disabled="salvandoProcedimento">
+            {{ salvandoProcedimento ? 'Salvando...' : 'Cadastrar procedimento' }}
+          </button>
+        </div>
+      </form>
 
       <form class="fx-cartao" novalidate @submit.prevent="cadastrar">
         <h2 class="fx-secao-titulo">Novo contrato</h2>
@@ -157,5 +196,12 @@ onMounted(carregar)
 
 .filtro {
   max-width: 320px;
+}
+
+.linha-procedimento {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
 }
 </style>

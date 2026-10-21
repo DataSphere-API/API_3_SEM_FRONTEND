@@ -2,7 +2,8 @@ import { api } from './http.js'
 import {
   mockListarContratos,
   mockCriarContrato,
-  mockListarProcedimentos
+  mockListarProcedimentos,
+  mockCriarProcedimento
 } from '../mocks/cadastrosMock.js'
 import { traduzirErro } from '../utils/erros.js'
 
@@ -35,5 +36,15 @@ export async function listarProcedimentos() {
     return response.data
   } catch (erro) {
     throw traduzirErro(erro)
+  }
+}
+
+export async function criarProcedimento(dados) {
+  try {
+    if (USAR_MOCK) return await mockCriarProcedimento(dados)
+    const response = await api.post('/procedimentos', dados)
+    return response.data
+  } catch (erro) {
+    throw traduzirErro(erro, { 409: 'Já existe um procedimento com esse nome.' })
   }
 }
