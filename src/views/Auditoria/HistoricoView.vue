@@ -164,7 +164,10 @@ onMounted(async () => {
             <li v-for="e in espelhos" :key="e.id">
               <button type="button" class="fx-cartao item" @click="abrirEspelho(e)">
                 <span><strong class="fx-mono">#{{ e.id }}</strong> · {{ e.ocsNome }}</span>
-                <span class="fx-suave">Atendimento {{ e.atendimentoId }} · {{ formatarMoeda(e.valorTotal) }} · {{ e.status }}</span>
+                <span class="fx-suave">
+                  {{ formatarData(e.dataInicio) }} a {{ formatarData(e.dataFim) }} · {{ e.quantidadeItens }} atendimento(s) ·
+                  {{ formatarMoeda(e.valorTotal) }} · {{ e.status }}
+                </span>
               </button>
             </li>
           </ul>

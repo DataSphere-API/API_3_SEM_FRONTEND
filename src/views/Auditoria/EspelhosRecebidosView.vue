@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { listarEspelhos, listarItensEspelho, aprovarEspelho, reprovarEspelho } from '../../services/espelhoService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData, formatarDataHora } from '../../utils/documentos.js'
+import { avaliarCobranca, pontuacaoDoEspelho, classeDaPontuacao } from '../../utils/pontuacao.js'
 
 const STATUS = {
   EM_ABERTO: { texto: 'A auditar', classe: 'fx-selo-ambar' },
@@ -33,6 +34,11 @@ const decidindo = ref(false)
 
 const lista = computed(() => (filtro.value ? espelhos.value.filter(e => e.status === filtro.value) : espelhos.value))
 const aAuditar = computed(() => espelhos.value.filter(e => e.status === 'EM_ABERTO').length)
+
+const totalContratado = computed(() => itens.value.reduce((soma, i) => soma + (Number(i.valorContratado) || 0), 0))
+const totalCobrado = computed(() => itens.value.reduce((soma, i) => soma + (Number(i.valor) || 0), 0))
+const pontuacaoGeral = computed(() => pontuacaoDoEspelho(itens.value))
+const itensAcima = computed(() => itens.value.filter(i => avaliarCobranca(i.valor, i.valorContratado).pontuacao < 100).length)
 
 function selo(status) {
   return STATUS[status] || { texto: status, classe: 'fx-selo-cinza' }
@@ -133,8 +139,8 @@ onMounted(carregar)
               <tr>
                 <th>Espelho</th>
                 <th>OCS</th>
-                <th>Atendimento</th>
-                <th>Itens</th>
+                <th>Período</th>
+                <th>Atendimentos</th>
                 <th>Valor</th>
                 <th>Situação</th>
                 <th><span class="fx-suave">Ação</span></th>
@@ -144,7 +150,7 @@ onMounted(carregar)
               <tr v-for="e in lista" :key="e.id">
                 <td class="fx-mono">#{{ e.id }}</td>
                 <td>{{ e.ocsNome }}</td>
-                <td class="fx-mono">{{ e.atendimentoId }}</td>
+                <td>{{ formatarData(e.dataInicio) }} a {{ formatarData(e.dataFim) }}</td>
                 <td>{{ e.quantidadeItens }}</td>
                 <td class="fx-mono">{{ formatarMoeda(e.valorTotal) }}</td>
                 <td><span class="fx-selo" :class="selo(e.status).classe">{{ selo(e.status).texto }}</span></td>
@@ -174,36 +180,80 @@ onMounted(carregar)
           </div>
           <dl class="dados">
             <div><dt>OCS</dt><dd>{{ selecionado.ocsNome }}</dd></div>
-            <div><dt>Atendimento</dt><dd class="fx-mono">{{ selecionado.atendimentoId }}</dd></div>
             <div><dt>Período</dt><dd>{{ formatarData(selecionado.dataInicio) }} a {{ formatarData(selecionado.dataFim) }}</dd></div>
+            <div><dt>Atendimentos</dt><dd>{{ itens.length }}</dd></div>
             <div v-if="selecionado.dataAtualizacao"><dt>Auditado em</dt><dd>{{ formatarDataHora(selecionado.dataAtualizacao) }}</dd></div>
           </dl>
           <p v-if="selecionado.motivoReprovacao" class="fx-alerta fx-alerta-vermelho">
             <strong>Motivo da reprovação:</strong> {{ selecionado.motivoReprovacao }}
           </p>
 
+          <div class="placar">
+            <div class="placar-item">
+              <span class="fx-suave">Pontuação do espelho</span>
+              <span class="fx-selo nota" :class="classeDaPontuacao(pontuacaoGeral)">{{ pontuacaoGeral }}/100</span>
+            </div>
+            <div class="placar-item">
+              <span class="fx-suave">Contrato</span>
+              <strong class="fx-mono">{{ formatarMoeda(totalContratado) }}</strong>
+            </div>
+            <div class="placar-item">
+              <span class="fx-suave">Cobrado pela OCS</span>
+              <strong class="fx-mono">{{ formatarMoeda(totalCobrado) }}</strong>
+            </div>
+            <div class="placar-item">
+              <span class="fx-suave">Diferença</span>
+              <strong class="fx-mono" :class="{ acima: totalCobrado > totalContratado }">
+                {{ formatarMoeda(totalCobrado - totalContratado) }}
+              </strong>
+            </div>
+          </div>
+          <p v-if="itensAcima" class="fx-alerta fx-alerta-ambar">
+            {{ itensAcima }} atendimento(s) cobrado(s) acima do contrato ou sem contrato.
+          </p>
+
           <div class="fx-tabela-rolagem">
             <table class="fx-tabela">
               <thead>
                 <tr>
-                  <th>Item</th>
-                  <th>Beneficiário (Prec-CP)</th>
-                  <th>Valor</th>
+                  <th>Atendimento</th>
+                  <th>Procedimento</th>
+                  <th>Beneficiário</th>
+                  <th>Contrato</th>
+                  <th>Cobrado</th>
+                  <th>Diferença</th>
+                  <th>Pontuação</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="i in itens" :key="i.id">
+                  <td class="fx-mono">{{ i.atendimentoId }}</td>
                   <td>{{ i.descricao }}</td>
                   <td class="fx-mono">{{ i.beneficiarioId }}</td>
+                  <td class="fx-mono">{{ i.valorContratado === null ? '—' : formatarMoeda(i.valorContratado) }}</td>
                   <td class="fx-mono">{{ formatarMoeda(i.valor) }}</td>
-                </tr>
-                <tr>
-                  <td colspan="2"><strong>Total</strong></td>
-                  <td class="fx-mono"><strong>{{ formatarMoeda(selecionado.valorTotal) }}</strong></td>
+                  <td class="fx-mono" :class="{ acima: avaliarCobranca(i.valor, i.valorContratado).diferenca > 0 }">
+                    <template v-if="avaliarCobranca(i.valor, i.valorContratado).diferenca === null">—</template>
+                    <template v-else>
+                      {{ formatarMoeda(avaliarCobranca(i.valor, i.valorContratado).diferenca) }}
+                      <span v-if="avaliarCobranca(i.valor, i.valorContratado).diferenca > 0" class="fx-suave">
+                        (+{{ avaliarCobranca(i.valor, i.valorContratado).percentual.toFixed(1) }}%)
+                      </span>
+                    </template>
+                  </td>
+                  <td>
+                    <span class="fx-selo" :class="avaliarCobranca(i.valor, i.valorContratado).classe">
+                      {{ avaliarCobranca(i.valor, i.valorContratado).pontuacao }} · {{ avaliarCobranca(i.valor, i.valorContratado).texto }}
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
+          <p class="fx-suave">
+            Pontuação: 100 quando o valor cobrado está dentro do contrato; cai 1 ponto por ponto percentual acima.
+            Faixas da US002-2: baixa até 5%, média até 15%, alta acima disso. Sem contrato vale 0.
+          </p>
 
           <router-link :to="{ name: 'historico', query: { espelho: selecionado.id } }" class="link">
             Ver histórico deste espelho →
@@ -281,5 +331,30 @@ onMounted(carregar)
 .link {
   color: var(--fx-verde);
   font-weight: 600;
+}
+
+.placar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+}
+
+.placar-item {
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  border: 1px solid var(--fx-borda);
+  border-radius: 10px;
+  background-color: #fafbf8;
+}
+
+.nota {
+  align-self: flex-start;
+  font-size: 0.95rem;
+}
+
+.acima {
+  color: #a3261b;
 }
 </style>
