@@ -6,12 +6,16 @@ import { listarAtendimentosDaOcs } from '../../services/checkMutuoService.js'
 import { sessao } from '../../stores/sessao.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
+import { competenciaAtual, competenciaDe, primeiroDiaDe, rotuloCompetencia } from '../../utils/competencia.js'
 
 const router = useRouter()
 const cnpj = sessao.usuario?.ocsCnpj || ''
 
+// O espelho só pode ter atendimentos do mês atual: ele entra na fatura deste mês.
 const hoje = new Date().toISOString().slice(0, 10)
-const dataInicio = ref(`${hoje.slice(0, 7)}-01`)
+const mes = competenciaAtual()
+const inicioDoMes = primeiroDiaDe(mes)
+const dataInicio = ref(inicioDoMes)
 const dataFim = ref(hoje)
 
 const atendimentos = ref([])
@@ -28,6 +32,14 @@ const disponiveis = computed(() =>
     const dia = a.dataRealizacao.slice(0, 10)
     return dia >= dataInicio.value && dia <= dataFim.value
   })
+)
+
+// Realizados em meses anteriores e que ficaram sem espelho: não entram mais.
+const deMesesAnteriores = computed(
+  () =>
+    atendimentos.value.filter(
+      a => a.statusProcedimento === 'REALIZADA' && !a.espelhoId && a.dataRealizacao && competenciaDe(a.dataRealizacao) < mes
+    ).length
 )
 
 const escolhidos = computed(() => disponiveis.value.filter(a => selecionados.value[a.atendimentoId]))
@@ -52,6 +64,10 @@ async function enviar() {
   erro.value = ''
   if (dataFim.value < dataInicio.value) {
     erro.value = 'O fim do período não pode ser antes do início.'
+    return
+  }
+  if (dataInicio.value < inicioDoMes || dataFim.value > hoje) {
+    erro.value = `O espelho só pode ter atendimentos de ${rotuloCompetencia(mes)}, até hoje.`
     return
   }
   if (escolhidos.value.length === 0) {
@@ -91,22 +107,27 @@ onMounted(carregar)
       <header>
         <h1 class="fx-titulo">Novo espelho</h1>
         <p class="fx-subtitulo">
-          O espelho junta todos os atendimentos realizados no período. Informe quanto a clínica cobra por cada um.
+          O espelho junta os atendimentos realizados em <strong>{{ rotuloCompetencia(mes) }}</strong> e entra na fatura
+          deste mês. Informe quanto a clínica cobra por cada um.
         </p>
       </header>
 
       <section class="fx-cartao">
-        <h2 class="fx-secao-titulo">1. Período</h2>
+        <h2 class="fx-secao-titulo">1. Período (dentro de {{ rotuloCompetencia(mes) }})</h2>
         <div class="fx-grade">
           <label class="fx-campo">
             De
-            <input v-model="dataInicio" type="date" class="fx-entrada" />
+            <input v-model="dataInicio" type="date" class="fx-entrada" :min="inicioDoMes" :max="hoje" />
           </label>
           <label class="fx-campo">
             Até
-            <input v-model="dataFim" type="date" class="fx-entrada" />
+            <input v-model="dataFim" type="date" class="fx-entrada" :min="inicioDoMes" :max="hoje" />
           </label>
         </div>
+        <p v-if="deMesesAnteriores" class="fx-alerta fx-alerta-ambar">
+          {{ deMesesAnteriores }} atendimento(s) realizado(s) em meses anteriores ficaram sem espelho e não podem mais
+          ser cobrados por aqui.
+        </p>
       </section>
 
       <section class="fx-cartao">

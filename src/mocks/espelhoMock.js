@@ -1,9 +1,11 @@
 // Espelho = os atendimentos realizados de uma OCS num período (cada item é um atendimento, com o valor
 // que a OCS cobra). O auditor recebe cada item com o valor do contrato para comparar (US002).
 // Reprovado, ele volta para a OCS corrigir e reenviar o mesmo espelho (sem criar outro).
-import { banco, persistir, proximoId, copiar, registrarHistorico } from './bancoMock.js'
+import { banco, persistir, proximoId, copiar, registrarHistorico, valorContratadoDoAtendimento } from './bancoMock.js'
 import { erroHttp, esperar } from './auxiliares.js'
 import { atendimentos } from './checkMutuoMock.js'
+import { incluirEspelhoNaFatura } from './faturaMensalMock.js'
+import { competenciaAtual, competenciaDe } from '../utils/competencia.js'
 
 function resumo(espelho) {
   const db = banco()
@@ -34,17 +36,6 @@ function encontrar(id) {
   return espelho
 }
 
-// Valor do contrato do procedimento do atendimento com a OCS (Guia_Proc → Contrato, US001-2).
-function valorContratado(atendimentoId) {
-  const db = banco()
-  const procedimento = db.preGuias.flatMap(p => p.procedimentos).find(p => p.atendimentoId === atendimentoId)
-  if (!procedimento) return null
-  const contrato = db.contratos.find(
-    c => c.procedimentoId === procedimento.procedimentoId && c.ocsCnpj === procedimento.ocsCnpj
-  )
-  return contrato ? contrato.valor : null
-}
-
 export async function mockListarEspelhos({ cnpj, status } = {}) {
   await esperar(300)
   return banco()
@@ -64,7 +55,7 @@ export async function mockListarItensEspelho(id) {
         beneficiarioId: i.beneficiarioId,
         descricao: i.descricao,
         valor: i.valor,
-        valorContratado: valorContratado(i.atendimentoId)
+        valorContratado: valorContratadoDoAtendimento(i.atendimentoId)
       }))
   )
 }
@@ -75,6 +66,10 @@ export async function mockCriarEspelho({ ocsId, dataInicio, dataFim, itens }) {
   const db = banco()
   if (!dataInicio || !dataFim || dataFim < dataInicio) {
     throw erroHttp(400, { codigo: 'PERIODO_INVALIDO', mensagem: 'Informe um período válido.' })
+  }
+  // O espelho é do mês em que é enviado: entra na fatura desse mês.
+  if (competenciaDe(dataInicio) !== competenciaAtual() || competenciaDe(dataFim) !== competenciaAtual()) {
+    throw erroHttp(422, { codigo: 'FORA_DO_MES', mensagem: 'O espelho só pode ter atendimentos do mês atual.' })
   }
   if (!itens?.length) {
     throw erroHttp(400, { codigo: 'ITENS_OBRIGATORIOS', mensagem: 'Escolha pelo menos um atendimento.' })
@@ -144,9 +139,16 @@ function decidir(id, statusNovo, motivo, origem) {
   return resumo(espelho)
 }
 
+// Aprovado, o espelho entra na fatura mensal da OCS.
 export async function mockAprovarEspelho(id) {
   await esperar(400)
-  return decidir(id, 'APROVADO', null, 'auditoria')
+  const espelho = encontrar(id)
+  if (espelho.status !== 'EM_ABERTO') {
+    throw erroHttp(409, { codigo: 'ESPELHO_JA_AUDITADO', mensagem: 'Este espelho já foi auditado.' })
+  }
+  const fatura = incluirEspelhoNaFatura(espelho)
+  const resposta = decidir(id, 'APROVADO', null, 'auditoria')
+  return { ...resposta, faturaId: fatura.id, competencia: fatura.competencia }
 }
 
 export async function mockReprovarEspelho(id, motivo) {
