@@ -1,394 +1,209 @@
-<template>
-  <div class="criar-espelho-page">
-    <div class="page-content">
-      <router-link to="/espelhos" class="back-link">
-        &larr; Voltar
-      </router-link>
-
-      <div class="page-header">
-        <h1>Novo espelho</h1>
-        <p>
-          Cadastre um espelho a partir de um atendimento já realizado.
-        </p>
-      </div>
-
-      <form class="section-card" @submit.prevent="enviar">
-        <div class="field-row">
-          <div class="field">
-            <label for="atendimentoId">
-              ID do atendimento
-            </label>
-
-            <input
-              id="atendimentoId"
-              v-model.number="form.atendimentoId"
-              type="number"
-              required
-            />
-          </div>
-
-          <div class="field">
-            <label for="ocsId">
-              CNPJ da OCS
-            </label>
-
-            <input
-              id="ocsId"
-              v-model="form.ocsId"
-              type="text"
-              placeholder="00000000000000"
-              readonly
-              required
-            />
-          </div>
-        </div>
-
-        <div class="itens-section">
-          <div class="itens-header">
-            <h2>Itens do espelho</h2>
-
-            <button
-              type="button"
-              class="add-button"
-              @click="adicionarItem"
-            >
-              + Adicionar item
-            </button>
-          </div>
-
-          <div
-            v-for="(item, index) in form.itens"
-            :key="index"
-            class="item-row"
-          >
-            <div class="field">
-              <label>Beneficiário (PrecCP)</label>
-
-              <input
-                v-model="item.beneficiarioId"
-                type="text"
-                required
-              />
-            </div>
-
-            <div class="field">
-              <label>Descrição</label>
-
-              <input
-                v-model="item.descricao"
-                type="text"
-                required
-              />
-            </div>
-
-            <div class="field valor-field">
-              <label>Valor</label>
-
-              <input
-                v-model.number="item.valor"
-                type="number"
-                min="0"
-                step="0.01"
-                required
-              />
-            </div>
-
-            <button
-              type="button"
-              class="remove-button"
-              :disabled="form.itens.length === 1"
-              @click="removerItem(index)"
-            >
-              Remover
-            </button>
-          </div>
-        </div>
-
-        <p v-if="erro" class="error-message">
-          {{ erro }}
-        </p>
-
-        <div class="actions">
-          <router-link
-            to="/espelhos"
-            class="cancel-button"
-          >
-            Cancelar
-          </router-link>
-
-          <button
-            type="submit"
-            class="submit-button"
-            :disabled="enviando"
-          >
-            {{ enviando ? 'Criando...' : 'Criar espelho' }}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</template>
-
 <script setup>
-import { reactive, ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { criarEspelho } from '../../services/espelhoService.js'
+import { listarAtendimentosDaOcs } from '../../services/checkMutuoService.js'
 import { sessao } from '../../stores/sessao.js'
+import { formatarMoeda } from '../../utils/avaliarLisura.js'
+import { formatarData } from '../../utils/documentos.js'
 
 const router = useRouter()
+const cnpj = sessao.usuario?.ocsCnpj || ''
 
-const form = reactive({
-  atendimentoId: null,
-  ocsId: sessao.usuario?.ocsCnpj || '',
-  itens: [
-    {
-      beneficiarioId: '',
-      descricao: '',
-      valor: null
-    }
-  ]
-})
+const hoje = new Date().toISOString().slice(0, 10)
+const dataInicio = ref(`${hoje.slice(0, 7)}-01`)
+const dataFim = ref(hoje)
 
+const atendimentos = ref([])
+const selecionados = ref({})
+const valores = ref({})
+const carregando = ref(false)
 const erro = ref('')
 const enviando = ref(false)
 
-function adicionarItem() {
-  form.itens.push({
-    beneficiarioId: '',
-    descricao: '',
-    valor: null
+// Realizados (beneficiário confirmou), sem espelho e com a última sessão dentro do período.
+const disponiveis = computed(() =>
+  atendimentos.value.filter(a => {
+    if (a.statusProcedimento !== 'REALIZADA' || a.espelhoId || !a.dataRealizacao) return false
+    const dia = a.dataRealizacao.slice(0, 10)
+    return dia >= dataInicio.value && dia <= dataFim.value
   })
-}
+)
 
-function removerItem(index) {
-  form.itens.splice(index, 1)
+const escolhidos = computed(() => disponiveis.value.filter(a => selecionados.value[a.atendimentoId]))
+const total = computed(() => escolhidos.value.reduce((soma, a) => soma + (Number(valores.value[a.atendimentoId]) || 0), 0))
+
+async function carregar() {
+  carregando.value = true
+  erro.value = ''
+  try {
+    atendimentos.value = await listarAtendimentosDaOcs(cnpj)
+    atendimentos.value.forEach(a => {
+      if (selecionados.value[a.atendimentoId] === undefined) selecionados.value[a.atendimentoId] = true
+    })
+  } catch (e) {
+    erro.value = e.mensagemUsuario || 'Não foi possível carregar os atendimentos.'
+  } finally {
+    carregando.value = false
+  }
 }
 
 async function enviar() {
   erro.value = ''
-  enviando.value = true
+  if (dataFim.value < dataInicio.value) {
+    erro.value = 'O fim do período não pode ser antes do início.'
+    return
+  }
+  if (escolhidos.value.length === 0) {
+    erro.value = 'Marque pelo menos um atendimento.'
+    return
+  }
+  if (escolhidos.value.some(a => !(Number(valores.value[a.atendimentoId]) > 0))) {
+    erro.value = 'Informe o valor cobrado de todos os atendimentos marcados.'
+    return
+  }
 
+  enviando.value = true
   try {
     await criarEspelho({
-      atendimentoId: form.atendimentoId,
-      ocsId: form.ocsId,
-      itens: form.itens
+      ocsId: cnpj,
+      dataInicio: dataInicio.value,
+      dataFim: dataFim.value,
+      itens: escolhidos.value.map(a => ({ atendimentoId: a.atendimentoId, valor: Number(valores.value[a.atendimentoId]) }))
     })
-
     router.push('/espelhos')
-  } catch (error) {
-    erro.value = error.mensagemUsuario || 'Não foi possível criar o espelho.'
+  } catch (e) {
+    erro.value = e.mensagemUsuario || 'Não foi possível enviar o espelho.'
   } finally {
     enviando.value = false
   }
 }
+
+onMounted(carregar)
 </script>
 
+<template>
+  <main class="fx-pagina">
+    <form class="fx-conteudo fx-conteudo-largo" novalidate @submit.prevent="enviar">
+      <div>
+        <router-link to="/espelhos" class="voltar">← Voltar</router-link>
+      </div>
+      <header>
+        <h1 class="fx-titulo">Novo espelho</h1>
+        <p class="fx-subtitulo">
+          O espelho junta todos os atendimentos realizados no período. Informe quanto a clínica cobra por cada um.
+        </p>
+      </header>
+
+      <section class="fx-cartao">
+        <h2 class="fx-secao-titulo">1. Período</h2>
+        <div class="fx-grade">
+          <label class="fx-campo">
+            De
+            <input v-model="dataInicio" type="date" class="fx-entrada" />
+          </label>
+          <label class="fx-campo">
+            Até
+            <input v-model="dataFim" type="date" class="fx-entrada" />
+          </label>
+        </div>
+      </section>
+
+      <section class="fx-cartao">
+        <h2 class="fx-secao-titulo">2. Atendimentos realizados no período</h2>
+        <p class="fx-suave">
+          Só aparecem atendimentos confirmados pelo beneficiário e que ainda não estão em outro espelho.
+        </p>
+
+        <p v-if="carregando" class="fx-alerta fx-alerta-cinza">Carregando atendimentos...</p>
+        <p v-else-if="disponiveis.length === 0" class="fx-alerta fx-alerta-cinza">
+          Nenhum atendimento realizado neste período.
+        </p>
+
+        <div v-else class="fx-tabela-rolagem">
+          <table class="fx-tabela">
+            <thead>
+              <tr>
+                <th><span class="fx-suave">Incluir</span></th>
+                <th>Atendimento</th>
+                <th>Beneficiário</th>
+                <th>Procedimento</th>
+                <th>Realizado em</th>
+                <th>Valor cobrado (R$)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in disponiveis" :key="a.atendimentoId">
+                <td>
+                  <input
+                    v-model="selecionados[a.atendimentoId]"
+                    type="checkbox"
+                    class="marcar"
+                    :aria-label="`Incluir atendimento ${a.atendimentoId}`"
+                  />
+                </td>
+                <td class="fx-mono">{{ a.atendimentoId }}</td>
+                <td>{{ a.beneficiario.nome }} <span class="fx-suave fx-mono">· {{ a.beneficiario.precCp }}</span></td>
+                <td>{{ a.procedimento }}<span v-if="a.qtdAutorizada > 1" class="fx-suave"> · {{ a.qtdAutorizada }} sessões</span></td>
+                <td>{{ formatarData(a.dataRealizacao) }}</td>
+                <td>
+                  <input
+                    v-model="valores[a.atendimentoId]"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    class="fx-entrada campo-valor"
+                    :disabled="!selecionados[a.atendimentoId]"
+                    :aria-label="`Valor cobrado do atendimento ${a.atendimentoId}`"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
+
+      <div class="rodape">
+        <strong>{{ escolhidos.length }} atendimento(s) · Total: <span class="fx-mono">{{ formatarMoeda(total) }}</span></strong>
+        <div class="fx-acoes">
+          <router-link to="/espelhos" class="fx-botao-secundario link-botao">Cancelar</router-link>
+          <button type="submit" class="fx-botao" :disabled="enviando || carregando">
+            {{ enviando ? 'Enviando...' : 'Enviar espelho para auditoria' }}
+          </button>
+        </div>
+      </div>
+    </form>
+  </main>
+</template>
+
 <style scoped>
-.criar-espelho-page {
-  min-height: 100vh;
-  padding: 2.5rem 1.5rem;
-  background-color: var(--color-background);
+.voltar {
+  color: var(--fx-verde);
+  font-weight: 600;
 }
 
-.page-content {
-  width: min(800px, 100%);
-  margin: 0 auto;
+.marcar {
+  width: 20px;
+  height: 20px;
 }
 
-.back-link {
-  display: inline-block;
-  margin-bottom: 1.5rem;
-  color: var(--secondary-text-color);
-  font-size: 0.85rem;
-  text-decoration: none;
+.campo-valor {
+  width: 140px;
 }
 
-.page-header {
-  margin-bottom: 1.5rem;
-}
-
-.page-header h1 {
-  margin: 0;
-  color: var(--text-color);
-  font-family: "DM Sans", sans-serif;
-  font-size: 1.6rem;
-  font-weight: 700;
-}
-
-.page-header p {
-  margin: 0.4rem 0 0;
-  color: var(--text-light-color);
-  font-size: 0.9rem;
-}
-
-.section-card {
-  padding: 1.5rem;
-  background-color: #ffffff;
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-}
-
-.field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.field {
+.rodape {
   display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.field label {
-  color: var(--text-color);
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.field input {
-  width: 100%;
-  min-width: 0;
-  padding: 0.7rem 0.9rem;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-family: "DM Sans", sans-serif;
-  font-size: 0.9rem;
-  outline: none;
-}
-
-.field input:focus {
-  border-color: var(--primary-color);
-}
-
-.itens-section {
-  margin-bottom: 1rem;
-}
-
-.itens-header {
-  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
-}
-
-.itens-header h2 {
-  margin: 0;
-  color: var(--text-color);
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.add-button {
-  padding: 0.45rem 0.9rem;
-  border: 1px solid var(--primary-color);
-  border-radius: 9999px;
-  background-color: var(--primary-light-bg-color);
-  color: var(--secondary-text-color);
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.item-row {
-  display: grid;
-  grid-template-columns: 1fr 2fr 1fr auto;
   gap: 0.75rem;
-  align-items: end;
-  margin-bottom: 1rem;
 }
 
-.remove-button {
-  padding: 0.65rem 0.9rem;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background-color: #ffffff;
-  color: var(--tertiary-text-color);
-  cursor: pointer;
-}
-
-.remove-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.error-message {
-  margin: 1rem 0 0;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  background-color: #FDEAEA;
-  color: #C05A5A;
-  font-size: 0.85rem;
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-}
-
-.cancel-button {
-  display: flex;
+.link-botao {
+  display: inline-flex;
   align-items: center;
-  padding: 0.7rem 1.2rem;
-  border: 1px solid var(--color-border);
-  border-radius: 9999px;
-  color: var(--tertiary-text-color);
-  font-size: 0.85rem;
   text-decoration: none;
-}
-
-.submit-button {
-  padding: 0.7rem 1.4rem;
-  border: none;
-  border-radius: 9999px;
-  background-color: var(--primary-color);
-  color: #ffffff;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.submit-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-@media (max-width: 768px) {
-  .criar-espelho-page {
-    padding: 1.5rem 1rem;
-  }
-
-  .section-card {
-    padding: 1rem;
-  }
-
-  .field-row,
-  .item-row {
-    grid-template-columns: 1fr;
-  }
-
-  .itens-header {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .add-button {
-    width: 100%;
-  }
-
-  .actions {
-    flex-direction: column-reverse;
-  }
-
-  .cancel-button,
-  .submit-button {
-    width: 100%;
-    justify-content: center;
-    text-align: center;
-  }
 }
 </style>

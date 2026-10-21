@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import { listarEspelhos } from '../../services/espelhoService.js'
+import { listarEspelhos, listarItensEspelho } from '../../services/espelhoService.js'
 import { sessao } from '../../stores/sessao.js'
 import EspelhosList from './components/EspelhosList.vue'
 import EspelhoDetalhes from './components/EspelhoDetalhes.vue'
@@ -25,9 +25,24 @@ async function carregarEspelhos() {
   }
 }
 
-function visualizarEspelho(espelho) {
-  espelhoSelecionado.value = espelho
-  modalAberto.value = true
+async function visualizarEspelho(espelho) {
+  try {
+    // Cada item do espelho é um atendimento: preço padrão = contrato, corrigido = o que a OCS cobrou.
+    const itens = await listarItensEspelho(espelho.id)
+    espelhoSelecionado.value = {
+      ...espelho,
+      guias: itens.map(item => ({
+        id: item.atendimentoId,
+        procedimento: item.descricao,
+        paciente: item.beneficiarioId,
+        precoPadrao: item.valorContratado ?? item.valor,
+        precoCorrigido: item.valor
+      }))
+    }
+    modalAberto.value = true
+  } catch (error) {
+    console.error('Erro ao carregar itens do espelho:', error)
+  }
 }
 
 function fecharDetalhes() {

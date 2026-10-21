@@ -1,5 +1,5 @@
-// Espelhos no formato da US000-14 (EspelhoResumoResponse / EspelhoItemResponse),
-// com o aprovar/reprovar do auditor e o histórico de status (US001-3).
+// Espelho = os atendimentos realizados de uma OCS num período (cada item é um atendimento, com o valor
+// que a OCS cobra). O auditor recebe cada item com o valor do contrato para comparar (US002).
 import { banco, persistir, proximoId, copiar, registrarHistorico } from './bancoMock.js'
 import { erroHttp, esperar } from './auxiliares.js'
 import { atendimentos } from './checkMutuoMock.js'
@@ -9,13 +9,12 @@ function resumo(espelho) {
   const itens = db.espelhoItens.filter(i => i.espelhoId === espelho.id)
   return {
     id: espelho.id,
-    atendimentoId: espelho.atendimentoId,
     ocsId: espelho.ocsId,
+    ocsNome: db.ocs.find(o => o.cnpj === espelho.ocsId)?.nome || espelho.ocsId,
     dataInicio: espelho.dataInicio,
     dataFim: espelho.dataFim,
     status: espelho.status,
     dataAtualizacao: espelho.dataAtualizacao,
-    ocsNome: db.ocs.find(o => o.cnpj === espelho.ocsId)?.nome || espelho.ocsId,
     quantidadeItens: itens.length,
     valorTotal: itens.reduce((total, i) => total + i.valor, 0),
     motivoReprovacao: espelho.motivoReprovacao
@@ -28,6 +27,17 @@ function encontrar(id) {
     throw erroHttp(404, { codigo: 'ESPELHO_NAO_ENCONTRADO', mensagem: 'Espelho não encontrado.' })
   }
   return espelho
+}
+
+// Valor do contrato do procedimento do atendimento com a OCS (Guia_Proc → Contrato, US001-2).
+function valorContratado(atendimentoId) {
+  const db = banco()
+  const procedimento = db.preGuias.flatMap(p => p.procedimentos).find(p => p.atendimentoId === atendimentoId)
+  if (!procedimento) return null
+  const contrato = db.contratos.find(
+    c => c.procedimentoId === procedimento.procedimentoId && c.ocsCnpj === procedimento.ocsCnpj
+  )
+  return contrato ? contrato.valor : null
 }
 
 export async function mockListarEspelhos({ cnpj, status } = {}) {
@@ -43,47 +53,68 @@ export async function mockListarItensEspelho(id) {
   return copiar(
     banco()
       .espelhoItens.filter(i => i.espelhoId === Number(id))
-      .map(({ id: itemId, beneficiarioId, descricao, valor }) => ({ id: itemId, beneficiarioId, descricao, valor }))
+      .map(i => ({
+        id: i.id,
+        atendimentoId: i.atendimentoId,
+        beneficiarioId: i.beneficiarioId,
+        descricao: i.descricao,
+        valor: i.valor,
+        valorContratado: valorContratado(i.atendimentoId)
+      }))
   )
 }
 
-// POST /espelhos (US001-4): só para atendimento realizado e sem espelho.
-export async function mockCriarEspelho({ atendimentoId, ocsId, itens }) {
+// POST /espelhos: { ocsId, dataInicio, dataFim, itens: [{ atendimentoId, valor }] }
+export async function mockCriarEspelho({ ocsId, dataInicio, dataFim, itens }) {
   await esperar(400)
   const db = banco()
-  const atendimento = atendimentos().find(a => a.atendimentoId === Number(atendimentoId))
-  if (!atendimento || atendimento.ocs.cnpj !== ocsId) {
-    throw erroHttp(404, { codigo: 'ATENDIMENTO_NAO_ENCONTRADO', mensagem: 'Atendimento não encontrado para esta OCS.' })
-  }
-  if (atendimento.statusProcedimento !== 'REALIZADA') {
-    throw erroHttp(422, { codigo: 'ATENDIMENTO_NAO_REALIZADO', mensagem: 'O atendimento ainda não foi confirmado pelo beneficiário.' })
-  }
-  if (db.espelhos.some(e => e.atendimentoId === atendimento.atendimentoId)) {
-    throw erroHttp(409, { codigo: 'ESPELHO_DUPLICADO', mensagem: 'Este atendimento já tem espelho.' })
+  if (!dataInicio || !dataFim || dataFim < dataInicio) {
+    throw erroHttp(400, { codigo: 'PERIODO_INVALIDO', mensagem: 'Informe um período válido.' })
   }
   if (!itens?.length) {
-    throw erroHttp(400, { codigo: 'ITENS_OBRIGATORIOS', mensagem: 'Adicione pelo menos um item.' })
+    throw erroHttp(400, { codigo: 'ITENS_OBRIGATORIOS', mensagem: 'Escolha pelo menos um atendimento.' })
   }
-  const hoje = new Date().toISOString().slice(0, 10)
+  const lista = atendimentos()
+  const novos = itens.map(item => {
+    const atendimento = lista.find(a => a.atendimentoId === Number(item.atendimentoId))
+    if (!atendimento || atendimento.ocs.cnpj !== ocsId) {
+      throw erroHttp(404, { codigo: 'ATENDIMENTO_NAO_ENCONTRADO', mensagem: `Atendimento ${item.atendimentoId} não é desta OCS.` })
+    }
+    if (atendimento.statusProcedimento !== 'REALIZADA') {
+      throw erroHttp(422, { codigo: 'ATENDIMENTO_NAO_REALIZADO', mensagem: `O atendimento ${item.atendimentoId} ainda não foi confirmado pelo beneficiário.` })
+    }
+    const dia = atendimento.dataRealizacao.slice(0, 10)
+    if (dia < dataInicio || dia > dataFim) {
+      throw erroHttp(422, { codigo: 'FORA_DO_PERIODO', mensagem: `O atendimento ${item.atendimentoId} foi realizado fora do período.` })
+    }
+    if (atendimento.espelhoId) {
+      throw erroHttp(409, { codigo: 'ATENDIMENTO_JA_EM_ESPELHO', mensagem: `O atendimento ${item.atendimentoId} já está no espelho #${atendimento.espelhoId}.` })
+    }
+    if (!(Number(item.valor) > 0)) {
+      throw erroHttp(400, { codigo: 'VALOR_INVALIDO', mensagem: 'Informe o valor cobrado de cada atendimento.' })
+    }
+    return { atendimento, valor: Number(item.valor) }
+  })
+
   const espelho = {
     id: proximoId(db.espelhos),
-    atendimentoId: atendimento.atendimentoId,
     ocsId,
-    dataInicio: hoje,
-    dataFim: hoje,
+    dataInicio,
+    dataFim,
     status: 'EM_ABERTO',
     dataAtualizacao: null,
     motivoReprovacao: null
   }
   db.espelhos.push(espelho)
   let proximoItem = proximoId(db.espelhoItens)
-  itens.forEach(item =>
+  novos.forEach(({ atendimento, valor }) =>
     db.espelhoItens.push({
       id: proximoItem++,
       espelhoId: espelho.id,
-      beneficiarioId: item.beneficiarioId || atendimento.beneficiario.precCp,
-      descricao: item.descricao,
-      valor: Number(item.valor)
+      atendimentoId: atendimento.atendimentoId,
+      beneficiarioId: atendimento.beneficiario.precCp,
+      descricao: atendimento.procedimento,
+      valor
     })
   )
   registrarHistorico('ESPELHO', espelho.id, null, 'EM_ABERTO', 'envio-pela-ocs')
