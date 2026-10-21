@@ -145,6 +145,9 @@ onUnmounted(() => clearInterval(temporizador))
         <p v-if="!carregando && !erro && lista.length === 0" class="fx-alerta fx-alerta-cinza">
           Nenhum atendimento neste filtro.
         </p>
+        <p v-if="filtro === 'REALIZADA'" class="fx-suave">
+          Para cobrar um atendimento realizado, use o número do atendimento em Espelhos → Novo espelho.
+        </p>
 
         <ul v-if="!carregando && !erro" class="fx-lista">
           <li v-for="a in lista" :key="a.atendimentoId" class="fx-cartao">
@@ -157,7 +160,11 @@ onUnmounted(() => clearInterval(temporizador))
             </div>
             <p class="linha">
               {{ a.procedimento }}
-              <span class="fx-suave"> · Guia <span class="fx-mono">{{ a.guiaNumero }}</span> · válida até {{ formatarData(a.dataValidade) }}</span>
+              <span class="fx-suave">
+                · Atendimento <span class="fx-mono">{{ a.atendimentoId }}</span>
+                · Guia <span class="fx-mono">{{ a.guiaNumero }}</span>
+                · válida até {{ formatarData(a.dataValidade) }}
+              </span>
             </p>
             <div>
               <div class="fx-suave">{{ a.qtdRealizada }}/{{ a.qtdAutorizada }} sessões confirmadas</div>
