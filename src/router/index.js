@@ -17,6 +17,8 @@ import AcompanhamentoView from '../views/Emissao/AcompanhamentoView.vue'
 import AprovadasView from '../views/Emissao/AprovadasView.vue'
 import AtendimentosOcsView from '../views/Atendimentos/AtendimentosOcsView.vue'
 import ConfirmarAtendimentoView from '../views/Guias/ConfirmarAtendimentoView.vue'
+import EspelhosRecebidosView from '../views/Auditoria/EspelhosRecebidosView.vue'
+import HistoricoView from '../views/Auditoria/HistoricoView.vue'
 import { sessao } from '../stores/sessao.js'
 import { PERFIS } from '../utils/perfis.js'
 
@@ -32,7 +34,7 @@ const routes = [
   { path: '/cadastro', name: 'cadastro', component: CadastroBeneficiarioView, meta: { publica: true } },
   { path: '/escolher-perfil', name: 'escolher-perfil', component: EscolherPerfilView },
 
-  { path: '/espelhos', name: 'espelhos', component: EspelhosViews, meta: { perfis: ['OCS', 'AUDITOR'] } },
+  { path: '/espelhos', name: 'espelhos', component: EspelhosViews, meta: { perfis: ['OCS'] } },
   { path: '/espelhos/novo', name: 'espelhos-novo', component: CriarEspelhoView, meta: { perfis: ['OCS'] } },
   { path: '/faturas', name: 'faturas', component: FaturasViews, meta: { perfis: ['AUDITOR'] } },
   { path: '/minhas-guias', name: 'minhas-guias', component: MinhasGuiasView, meta: { perfis: ['BENEFICIARIO'] } },
@@ -45,11 +47,13 @@ const routes = [
   { path: '/contratos', name: 'contratos', component: ContratosView, meta: { perfis: ['CHEFE'] } },
   { path: '/medico/nova-solicitacao', name: 'nova-solicitacao', component: SolicitacaoView, meta: { perfis: ['MEDICO'] } },
   { path: '/emissor/pre-guias/nova', name: 'criar-pre-guia', component: SolicitacaoView, meta: { perfis: ['EMISSOR'] } },
-  { path: '/emissor/pre-guias/:id/corrigir', name: 'corrigir-pre-guia', component: SolicitacaoView, meta: { perfis: ['EMISSOR'] } },
+  { path: '/emissor/pre-guias/:id/editar', name: 'editar-pre-guia', component: SolicitacaoView, meta: { perfis: ['EMISSOR'] } },
   { path: '/emissor/acompanhamento', name: 'acompanhamento', component: AcompanhamentoView, meta: { perfis: ['EMISSOR'] } },
   { path: '/emissor/aprovadas', name: 'aprovadas', component: AprovadasView, meta: { perfis: ['EMISSOR'] } },
   { path: '/ocs/atendimentos', name: 'atendimentos-ocs', component: AtendimentosOcsView, meta: { perfis: ['OCS'] } },
   { path: '/confirmar-atendimento', name: 'confirmar-atendimento', component: ConfirmarAtendimentoView, meta: { perfis: ['BENEFICIARIO'] } },
+  { path: '/auditor/espelhos', name: 'espelhos-recebidos', component: EspelhosRecebidosView, meta: { perfis: ['AUDITOR'] } },
+  { path: '/auditor/historico', name: 'historico', component: HistoricoView, meta: { perfis: ['AUDITOR'] } },
 
   { path: '/:caminho(.*)*', redirect: rotaInicial }
 ]

@@ -40,11 +40,12 @@ export const PERFIS = {
   },
   AUDITOR: {
     rotulo: 'Auditor',
-    descricao: 'Receber e auditar espelhos e faturas.',
-    rotaInicial: '/faturas',
+    descricao: 'Receber, aprovar ou reprovar espelhos e ver o histórico.',
+    rotaInicial: '/auditor/espelhos',
     menu: [
-      { rotulo: 'Espelhos', rota: '/espelhos' },
-      { rotulo: 'Faturas', rota: '/faturas' }
+      { rotulo: 'Espelhos recebidos', rota: '/auditor/espelhos' },
+      { rotulo: 'Faturas', rota: '/faturas' },
+      { rotulo: 'Histórico', rota: '/auditor/historico' }
     ]
   },
   OCS: {
@@ -58,8 +59,9 @@ export const PERFIS = {
   }
 }
 
-// O beneficiário se cadastra sozinho; o chefe só atribui os perfis de trabalho.
-export const PERFIS_ATRIBUIVEIS = ['CHEFE', 'MEDICO', 'EMISSOR', 'AUDITOR', 'OCS']
+// O beneficiário se cadastra sozinho. O chefe dá estes perfis a militares (pelo Prec-CP);
+// o perfil OCS é de funcionário de clínica.
+export const PERFIS_DE_MILITAR = ['CHEFE', 'MEDICO', 'EMISSOR', 'AUDITOR']
 
 export function rotuloPerfil(perfil) {
   return PERFIS[perfil]?.rotulo || perfil
