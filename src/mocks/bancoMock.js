@@ -1,6 +1,6 @@
 // Banco em memória dos mocks, no formato das tabelas e issues do back.
 // Fica salvo no localStorage para o fluxo continuar entre abas e logins de perfis diferentes.
-const CHAVE = 'fusex-banco-mock-v5'
+const CHAVE = 'fusex-banco-mock-v6'
 const SENHA_PADRAO = 'fusex123'
 
 const IMAGEM_CENTRO = '12345678000199'
@@ -131,6 +131,19 @@ function semente() {
         beneficiarioPrecCp: '123456',
         procedimentos: [{ atendimentoId: 106, procedimentoId: 5, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }],
         motivoReprovacao: 'Procedimento sem indicação clínica no pedido.'
+      }),
+      preGuia(9, {
+        status: 'EMITIDA',
+        beneficiarioPrecCp: '123456',
+        dataCriacao: '2026-08-28',
+        procedimentos: [
+          { atendimentoId: 701, procedimentoId: 3, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 },
+          { atendimentoId: 702, procedimentoId: 1, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }
+        ],
+        dataAprovacaoMedico: '2026-08-30T09:00:00',
+        dataAprovacaoChefe: '2026-08-30T10:00:00',
+        chefeId: 1,
+        dataEmissao: '2026-09-02'
       })
     ],
     // Sessao_Procedimento: só sessões já confirmadas pelo beneficiário (check mútuo).
@@ -138,15 +151,29 @@ function semente() {
     sessoes: [
       { id: 1, atendimentoId: 501, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-17T10:04:00' },
       { id: 2, atendimentoId: 601, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-11T08:41:00' },
-      { id: 3, atendimentoId: 602, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-12T15:20:00' }
+      { id: 3, atendimentoId: 602, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-12T15:20:00' },
+      { id: 4, atendimentoId: 701, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-09-10T09:30:00' },
+      { id: 5, atendimentoId: 702, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-09-18T14:00:00' }
     ],
     // Espelho = todos os atendimentos realizados de uma OCS num período; cada item é um atendimento.
     espelhos: [
-      { id: 1, atendimentoId: 601, ocsId: IMAGEM_CENTRO, dataInicio: '2026-10-01', dataFim: '2026-10-15', status: 'EM_ABERTO', dataAtualizacao: null, motivoReprovacao: null }
+      { id: 1, atendimentoId: 601, ocsId: IMAGEM_CENTRO, dataInicio: '2026-10-01', dataFim: '2026-10-15', status: 'EM_ABERTO', dataAtualizacao: null, motivoReprovacao: null },
+      { id: 2, atendimentoId: 701, ocsId: IMAGEM_CENTRO, dataInicio: '2026-09-01', dataFim: '2026-09-30', status: 'APROVADO', dataAtualizacao: '2026-10-02T11:00:00', motivoReprovacao: null }
     ],
     espelhoItens: [
       { id: 1, espelhoId: 1, atendimentoId: 601, beneficiarioId: '1001', descricao: 'Ultrassom · abdome total', valor: 310.0 },
-      { id: 2, espelhoId: 1, atendimentoId: 602, beneficiarioId: '1001', descricao: 'Raio-X · joelho', valor: 90.0 }
+      { id: 2, espelhoId: 1, atendimentoId: 602, beneficiarioId: '1001', descricao: 'Raio-X · joelho', valor: 90.0 },
+      { id: 3, espelhoId: 2, atendimentoId: 701, beneficiarioId: '123456', descricao: 'Ultrassom · abdome total', valor: 280.0 },
+      { id: 4, espelhoId: 2, atendimentoId: 702, beneficiarioId: '123456', descricao: 'TC Abdome Superior', valor: 750.0 }
+    ],
+    // Fatura mensal por OCS: junta os itens dos espelhos aprovados do mês (Item_Fatura → Espelho_Item).
+    // Fatura.Esp_Fat e Guia_Proc_ID (NOT NULL no banco) ficam com o primeiro espelho/atendimento.
+    faturas: [
+      { id: 1, ocsId: IMAGEM_CENTRO, competencia: '2026-09', espelhoId: 2, guiaProcId: 701, status: 'ATIVA', dataGeracao: '2026-10-02T11:00:00', dataEncaminhamento: null }
+    ],
+    itensFatura: [
+      { id: 1, faturaId: 1, espelhoItemId: 3, valorApresentado: 280.0, valorContratado: 280.0, divergenciaValor: 0 },
+      { id: 2, faturaId: 1, espelhoItemId: 4, valorApresentado: 750.0, valorContratado: 720.49, divergenciaValor: 29.51 }
     ],
     // historico_status (US001-3): GUIA_PROC usa o atendimentoId.
     historico: [
@@ -157,7 +184,10 @@ function semente() {
       { id: 5, entidadeTipo: 'GUIA_PROC', entidadeId: 601, statusAnterior: 'PENDENTE', statusNovo: 'REALIZADA', data: '2026-10-11T08:41:00', origem: 'confirmacao-do-beneficiario' },
       { id: 6, entidadeTipo: 'GUIA_PROC', entidadeId: 602, statusAnterior: null, statusNovo: 'PENDENTE', data: '2026-10-09T09:00:00', origem: 'emissao-da-guia' },
       { id: 7, entidadeTipo: 'GUIA_PROC', entidadeId: 602, statusAnterior: 'PENDENTE', statusNovo: 'REALIZADA', data: '2026-10-12T15:20:00', origem: 'confirmacao-do-beneficiario' },
-      { id: 8, entidadeTipo: 'ESPELHO', entidadeId: 1, statusAnterior: null, statusNovo: 'EM_ABERTO', data: '2026-10-16T14:00:00', origem: 'envio-pela-ocs' }
+      { id: 8, entidadeTipo: 'ESPELHO', entidadeId: 1, statusAnterior: null, statusNovo: 'EM_ABERTO', data: '2026-10-16T14:00:00', origem: 'envio-pela-ocs' },
+      { id: 9, entidadeTipo: 'ESPELHO', entidadeId: 2, statusAnterior: null, statusNovo: 'EM_ABERTO', data: '2026-09-30T17:00:00', origem: 'envio-pela-ocs' },
+      { id: 10, entidadeTipo: 'ESPELHO', entidadeId: 2, statusAnterior: 'EM_ABERTO', statusNovo: 'APROVADO', data: '2026-10-02T11:00:00', origem: 'auditoria' },
+      { id: 11, entidadeTipo: 'FATURA', entidadeId: 1, statusAnterior: null, statusNovo: 'ATIVA', data: '2026-10-02T11:00:00', origem: 'aprovacao-do-espelho' }
     ]
   }
 }
@@ -212,6 +242,17 @@ export function registrarHistorico(entidadeTipo, entidadeId, statusAnterior, sta
     data: new Date().toISOString(),
     origem
   })
+}
+
+// Valor do contrato do procedimento do atendimento com a OCS (Guia_Proc → Contrato, US001-2).
+export function valorContratadoDoAtendimento(atendimentoId) {
+  const db = banco()
+  const procedimento = db.preGuias.flatMap(p => p.procedimentos).find(p => p.atendimentoId === atendimentoId)
+  if (!procedimento) return null
+  const contrato = db.contratos.find(
+    c => c.procedimentoId === procedimento.procedimentoId && c.ocsCnpj === procedimento.ocsCnpj
+  )
+  return contrato ? contrato.valor : null
 }
 
 // Nome exibido de um usuário: o do beneficiário vinculado, ou o cargo na OCS.
