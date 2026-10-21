@@ -11,20 +11,25 @@
 | | Endpoint | O que faz |
 |---|---|---|
 | 🆕 | `POST /auth/login` | Entra com CPF e senha |
-| 🆕 | `POST /auth/cadastro` | Beneficiário cria o próprio login (primeiro acesso) |
+| 🆕 | `POST /auth/cadastro` | A pessoa cria o próprio cadastro de beneficiário e o login |
 | 🆕 | `GET /usuarios` | Lista os usuários (tela do chefe) |
 | 🆕 | `POST /usuarios` | Chefe dá perfis a um militar ou cria funcionário de OCS |
 | 🆕 | `GET /medicos` | Lista os médicos |
 | 🆕 | `GET /beneficiarios?busca=` | Busca beneficiário por nome ou Prec-CP |
 
-**Regra:** o login do militar nasce no autocadastro. O chefe só acrescenta perfis. Funcionário de OCS
-é o único que o chefe cria com CPF e senha.
+**Regras:**
+- Prec-CP no formato `123456789-00`. O **titular** termina em `-00`; o **dependente** usa o mesmo início
+  do titular com `-01`, `-02`... e informa o CPF do titular. Se o início não bater, dá erro.
+- O login do militar nasce no autocadastro. O chefe só acrescenta perfis. Funcionário de OCS é o único
+  que o chefe cria com CPF e senha.
 
 <details><summary>Ver detalhes</summary>
 
 - `POST /auth/login` `{ cpf, senha }` → `{ token, usuario: { id, nome, cpf, perfis, precCp, crm, ocsCnpj, cargo } }`. Erro 401 `CREDENCIAIS_INVALIDAS`.
 - Perfis: `Chefe_Fusex` → CHEFE · `Medico` → MEDICO · `Analista` → EMISSOR · `Auditor` → AUDITOR · `FunOcs` → OCS · `Beneficiario.Usuario_ID` → BENEFICIARIO.
-- `POST /auth/cadastro` `{ precCp, dataNascimento, cpf, senha }` → `{ id, nome }`. Confere Prec-CP + nascimento no `Beneficiario`. Erros: 422 `BENEFICIARIO_NAO_CONFERE`, 409 `BENEFICIARIO_JA_CADASTRADO`, 409 `CPF_JA_CADASTRADO`.
+- `POST /auth/cadastro` `{ nome, precCp, dataNascimento, dependente, cpfResponsavel, cpf, senha }` → `{ id, nome, precCp }`. Cria a linha em `Beneficiario` (com `Dependente`) e o `Usuario`, e liga pelo `Usuario_ID`. Se o Prec-CP já está no `Beneficiario` sem login, só liga (a data de nascimento precisa bater).
+- Dependente: acha o responsável pelo `Usuario.Login` = `cpfResponsavel`; o Prec-CP dele precisa terminar em `-00` e ter os mesmos 9 primeiros números.
+- Erros do cadastro: 400 `PREC_CP_INVALIDO`, 422 `PREC_CP_TITULAR_INVALIDO` (titular sem `-00`), 422 `PREC_CP_DEPENDENTE_INVALIDO` (dependente com `-00`), 422 `RESPONSAVEL_NAO_ENCONTRADO`, 422 `PREC_CP_NAO_CONFERE`, 422 `BENEFICIARIO_NAO_CONFERE`, 409 `BENEFICIARIO_JA_CADASTRADO`, 409 `CPF_JA_CADASTRADO`.
 - `POST /usuarios`, militar: `{ tipo: "MILITAR", precCp, perfis, crm }`. Erros: 422 `PRIMEIRO_ACESSO_PENDENTE`, 422 `PERFIL_OBRIGATORIO`, 422 `MEDICO_SEM_CRM`.
 - `POST /usuarios`, OCS: `{ tipo: "OCS", cpf, senha, ocsCnpj, cargo }`. Erros: 409 `CPF_JA_CADASTRADO`, 422 `OCS_NAO_ENCONTRADA`.
 - `GET /medicos` → `[{ id, nome, crm }]`.
@@ -181,4 +186,5 @@ ALTER TABLE Espelho ADD COLUMN Motivo_Reprovacao VARCHAR(255);
 | OCS | 628.194.821-12 |
 | Beneficiário | 993.518.190-19 |
 
-Primeiro acesso: Prec-CP `123456` e nascimento `21/07/1990`.
+Primeiro acesso: qualquer Prec-CP novo como titular (ex.: `987654321` + `-00`). Para testar dependente,
+use o CPF do beneficiário de teste acima (titular `100100100-00`) e um Prec-CP `100100100-02`.

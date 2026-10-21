@@ -71,7 +71,7 @@ onMounted(() => {
             v-model="precCp"
             type="text"
             class="fx-entrada"
-            placeholder="Ex.: 1001"
+            placeholder="Ex.: 100100100-00"
             autocomplete="off"
           />
         </label>

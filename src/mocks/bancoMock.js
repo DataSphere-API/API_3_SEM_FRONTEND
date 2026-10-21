@@ -1,6 +1,6 @@
 // Banco em memória dos mocks, no formato das tabelas e issues do back.
 // Fica salvo no localStorage para o fluxo continuar entre abas e logins de perfis diferentes.
-const CHAVE = 'fusex-banco-mock-v6'
+const CHAVE = 'fusex-banco-mock-v7'
 const SENHA_PADRAO = 'fusex123'
 
 const IMAGEM_CENTRO = '12345678000199'
@@ -48,34 +48,34 @@ function semente() {
     ],
     // Tabela Beneficiario: o autocadastro só aceita quem está aqui.
     beneficiarios: [
-      { precCp: '1001', nome: 'Fulano de Tal', dataNascimento: '1986-03-10', dependente: false, ug: '3º BD' },
-      { precCp: '123456', nome: 'Ana Paula Souza', dataNascimento: '1990-07-21', dependente: false, ug: '3º BD' },
-      { precCp: '7007', nome: 'João Pedro Lima', dataNascimento: '2001-01-15', dependente: true, ug: '3º BD' },
-      { precCp: '2002', nome: 'Rafael Duarte', dataNascimento: '1980-05-02', dependente: false, ug: '3º BD' },
-      { precCp: '3003', nome: 'Carlos Albuquerque', dataNascimento: '1975-11-30', dependente: false, ug: '3º BD' },
-      { precCp: '4004', nome: 'Luiz Fernandes', dataNascimento: '1992-09-14', dependente: false, ug: '3º BD' },
-      { precCp: '5005', nome: 'Marina Costa', dataNascimento: '1988-02-25', dependente: false, ug: '3º BD' },
-      { precCp: '6006', nome: 'Beatriz Nogueira', dataNascimento: '1995-12-01', dependente: false, ug: '3º BD' }
+      { precCp: '100100100-00', nome: 'Fulano de Tal', dataNascimento: '1986-03-10', dependente: false, ug: '3º BD' },
+      { precCp: '123456789-00', nome: 'Ana Paula Souza', dataNascimento: '1990-07-21', dependente: false, ug: '3º BD' },
+      { precCp: '100100100-01', nome: 'João Pedro Lima', dataNascimento: '2001-01-15', dependente: true, ug: '3º BD' },
+      { precCp: '200200200-00', nome: 'Rafael Duarte', dataNascimento: '1980-05-02', dependente: false, ug: '3º BD' },
+      { precCp: '300300300-00', nome: 'Carlos Albuquerque', dataNascimento: '1975-11-30', dependente: false, ug: '3º BD' },
+      { precCp: '400400400-00', nome: 'Luiz Fernandes', dataNascimento: '1992-09-14', dependente: false, ug: '3º BD' },
+      { precCp: '500500500-00', nome: 'Marina Costa', dataNascimento: '1988-02-25', dependente: false, ug: '3º BD' },
+      { precCp: '600600600-00', nome: 'Beatriz Nogueira', dataNascimento: '1995-12-01', dependente: false, ug: '3º BD' }
     ],
     // Usuario (Login = CPF) + o perfil que sai de Chefe_Fusex/Medico/Analista/Auditor/FunOcs/Beneficiario.
     // Militar da equipe é ligado ao Usuario pelo Beneficiario, então também é BENEFICIARIO.
     usuarios: [
-      { id: 1, cpf: '52601815906', senha: SENHA_PADRAO, perfis: ['CHEFE', 'BENEFICIARIO'], precCp: '3003', crm: '', ocsCnpj: '', cargo: '' },
-      { id: 2, cpf: '08301661305', senha: SENHA_PADRAO, perfis: ['MEDICO', 'BENEFICIARIO'], precCp: '2002', crm: '123456', ocsCnpj: '', cargo: '' },
-      { id: 3, cpf: '18609139034', senha: SENHA_PADRAO, perfis: ['EMISSOR', 'BENEFICIARIO'], precCp: '4004', crm: '', ocsCnpj: '', cargo: '' },
-      { id: 4, cpf: '99603082430', senha: SENHA_PADRAO, perfis: ['AUDITOR', 'BENEFICIARIO'], precCp: '5005', crm: '', ocsCnpj: '', cargo: '' },
+      { id: 1, cpf: '52601815906', senha: SENHA_PADRAO, perfis: ['CHEFE', 'BENEFICIARIO'], precCp: '300300300-00', crm: '', ocsCnpj: '', cargo: '' },
+      { id: 2, cpf: '08301661305', senha: SENHA_PADRAO, perfis: ['MEDICO', 'BENEFICIARIO'], precCp: '200200200-00', crm: '123456', ocsCnpj: '', cargo: '' },
+      { id: 3, cpf: '18609139034', senha: SENHA_PADRAO, perfis: ['EMISSOR', 'BENEFICIARIO'], precCp: '400400400-00', crm: '', ocsCnpj: '', cargo: '' },
+      { id: 4, cpf: '99603082430', senha: SENHA_PADRAO, perfis: ['AUDITOR', 'BENEFICIARIO'], precCp: '500500500-00', crm: '', ocsCnpj: '', cargo: '' },
       { id: 5, cpf: '62819482112', senha: SENHA_PADRAO, perfis: ['OCS'], precCp: '', crm: '', ocsCnpj: IMAGEM_CENTRO, cargo: 'Recepção' },
-      { id: 6, cpf: '99351819019', senha: SENHA_PADRAO, perfis: ['BENEFICIARIO'], precCp: '1001', crm: '', ocsCnpj: '', cargo: '' }
+      { id: 6, cpf: '99351819019', senha: SENHA_PADRAO, perfis: ['BENEFICIARIO'], precCp: '100100100-00', crm: '', ocsCnpj: '', cargo: '' }
     ],
     // Guia com status de pré-guia (US005/US006). Cada procedimento é um Guia_Proc (atendimentoId).
     preGuias: [
       preGuia(1, {
-        beneficiarioPrecCp: '1001',
+        beneficiarioPrecCp: '100100100-00',
         procedimentos: [{ atendimentoId: 101, procedimentoId: 1, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }]
       }),
       preGuia(2, {
         status: 'COM_PENDENCIAS',
-        beneficiarioPrecCp: '7007',
+        beneficiarioPrecCp: '100100100-01',
         procedimentos: [{ atendimentoId: 102, procedimentoId: 6, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }],
         pendencias: [{
           codigo: 'PROCEDIMENTO_SEM_CONTRATO',
@@ -85,18 +85,18 @@ function semente() {
       }),
       preGuia(3, {
         status: 'VALIDADA',
-        beneficiarioPrecCp: '123456',
+        beneficiarioPrecCp: '123456789-00',
         procedimentos: [{ atendimentoId: 103, procedimentoId: 3, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }]
       }),
       preGuia(4, {
         status: 'VALIDADA',
-        beneficiarioPrecCp: '7007',
+        beneficiarioPrecCp: '100100100-01',
         procedimentos: [{ atendimentoId: 104, procedimentoId: 4, ocsCnpj: MOVIMENTO, quantidade: 10 }],
         dataAprovacaoMedico: '2026-10-09T10:00:00'
       }),
       preGuia(5, {
         status: 'APROVADA',
-        beneficiarioPrecCp: '1001',
+        beneficiarioPrecCp: '100100100-00',
         procedimentos: [{ atendimentoId: 105, procedimentoId: 2, ocsCnpj: LAB_VIDA, quantidade: 1 }],
         dataAprovacaoMedico: '2026-10-10T09:00:00',
         dataAprovacaoChefe: '2026-10-10T11:00:00',
@@ -104,7 +104,7 @@ function semente() {
       }),
       preGuia(6, {
         status: 'EMITIDA',
-        beneficiarioPrecCp: '1001',
+        beneficiarioPrecCp: '100100100-00',
         procedimentos: [
           { atendimentoId: 501, procedimentoId: 5, ocsCnpj: IMAGEM_CENTRO, quantidade: 3 },
           { atendimentoId: 502, procedimentoId: 1, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }
@@ -116,7 +116,7 @@ function semente() {
       }),
       preGuia(7, {
         status: 'EMITIDA',
-        beneficiarioPrecCp: '1001',
+        beneficiarioPrecCp: '100100100-00',
         procedimentos: [
           { atendimentoId: 601, procedimentoId: 3, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 },
           { atendimentoId: 602, procedimentoId: 5, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }
@@ -128,13 +128,13 @@ function semente() {
       }),
       preGuia(8, {
         status: 'REPROVADA',
-        beneficiarioPrecCp: '123456',
+        beneficiarioPrecCp: '123456789-00',
         procedimentos: [{ atendimentoId: 106, procedimentoId: 5, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }],
         motivoReprovacao: 'Procedimento sem indicação clínica no pedido.'
       }),
       preGuia(9, {
         status: 'EMITIDA',
-        beneficiarioPrecCp: '123456',
+        beneficiarioPrecCp: '123456789-00',
         dataCriacao: '2026-08-28',
         procedimentos: [
           { atendimentoId: 701, procedimentoId: 3, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 },
@@ -161,10 +161,10 @@ function semente() {
       { id: 2, atendimentoId: 701, ocsId: IMAGEM_CENTRO, dataInicio: '2026-09-01', dataFim: '2026-09-30', status: 'APROVADO', dataAtualizacao: '2026-10-02T11:00:00', motivoReprovacao: null }
     ],
     espelhoItens: [
-      { id: 1, espelhoId: 1, atendimentoId: 601, beneficiarioId: '1001', descricao: 'Ultrassom · abdome total', valor: 310.0 },
-      { id: 2, espelhoId: 1, atendimentoId: 602, beneficiarioId: '1001', descricao: 'Raio-X · joelho', valor: 90.0 },
-      { id: 3, espelhoId: 2, atendimentoId: 701, beneficiarioId: '123456', descricao: 'Ultrassom · abdome total', valor: 280.0 },
-      { id: 4, espelhoId: 2, atendimentoId: 702, beneficiarioId: '123456', descricao: 'TC Abdome Superior', valor: 750.0 }
+      { id: 1, espelhoId: 1, atendimentoId: 601, beneficiarioId: '100100100-00', descricao: 'Ultrassom · abdome total', valor: 310.0 },
+      { id: 2, espelhoId: 1, atendimentoId: 602, beneficiarioId: '100100100-00', descricao: 'Raio-X · joelho', valor: 90.0 },
+      { id: 3, espelhoId: 2, atendimentoId: 701, beneficiarioId: '123456789-00', descricao: 'Ultrassom · abdome total', valor: 280.0 },
+      { id: 4, espelhoId: 2, atendimentoId: 702, beneficiarioId: '123456789-00', descricao: 'TC Abdome Superior', valor: 750.0 }
     ],
     // Fatura mensal por OCS: junta os itens dos espelhos aprovados do mês (Item_Fatura → Espelho_Item).
     // Fatura.Esp_Fat e Guia_Proc_ID (NOT NULL no banco) ficam com o primeiro espelho/atendimento.

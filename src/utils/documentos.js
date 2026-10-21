@@ -51,3 +51,23 @@ export function formatarDataHora(valor) {
     ? '—'
     : data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
+
+// Prec-CP: 9 dígitos + "-" + 2 dígitos. O titular termina em -00; os dependentes usam o mesmo
+// início com -01, -02...
+export const SUFIXO_TITULAR = '00'
+
+export function formatarPrecCp(valor) {
+  return somenteDigitos(valor).slice(0, 11).replace(/^(\d{9})(\d)/, '$1-$2')
+}
+
+export function precCpValido(valor) {
+  return /^\d{9}-\d{2}$/.test(String(valor ?? ''))
+}
+
+export function basePrecCp(precCp) {
+  return somenteDigitos(precCp).slice(0, 9)
+}
+
+export function ehTitular(precCp) {
+  return precCpValido(precCp) && precCp.endsWith(`-${SUFIXO_TITULAR}`)
+}

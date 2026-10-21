@@ -30,7 +30,7 @@ const errosCampo = ref({})
 const erro = ref('')
 const salvando = ref(false)
 
-// O login do militar nasce no autocadastro (Prec-CP + nascimento). Aqui o chefe só acrescenta perfis
+// O login do militar nasce no autocadastro. Aqui o chefe só acrescenta perfis
 // a quem já tem acesso; CPF e senha só são pedidos para funcionário de OCS, que não é beneficiário.
 function acessoDe(precCp) {
   return props.usuarios.find(u => u.precCp === precCp) || null
@@ -132,7 +132,7 @@ async function salvar() {
           </p>
           <p v-else-if="semPrimeiroAcesso" class="fx-alerta fx-alerta-ambar" role="alert">
             {{ militar.nome }} ainda não fez o primeiro acesso. Peça para entrar em <strong>Cadastre-se</strong>,
-            na tela de login, com o Prec-CP e a data de nascimento e criar a própria senha. Depois volte aqui
+            na tela de login, e criar a própria senha. Depois volte aqui
             para dar os perfis.
           </p>
           <template v-if="!militar">

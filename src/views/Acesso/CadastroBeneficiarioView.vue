@@ -1,11 +1,24 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, computed } from 'vue'
 import { cadastrarBeneficiario } from '../../services/authService.js'
-import { cpfValido, formatarCpf, somenteDigitos } from '../../utils/documentos.js'
+import {
+  basePrecCp,
+  cpfValido,
+  ehTitular,
+  formatarCpf,
+  formatarPrecCp,
+  precCpValido,
+  somenteDigitos,
+  SUFIXO_TITULAR
+} from '../../utils/documentos.js'
 
 const form = reactive({
-  precCp: '',
+  nome: '',
   dataNascimento: '',
+  dependente: false,
+  precCpTitular: '',
+  precCpDependente: '',
+  cpfResponsavel: '',
   cpf: '',
   senha: '',
   confirmarSenha: ''
@@ -16,10 +29,25 @@ const erro = ref('')
 const carregando = ref(false)
 const cadastrado = ref(null)
 
+// Titular digita só os 9 números (o -00 entra sozinho); dependente digita o Prec-CP inteiro.
+const precCp = computed(() =>
+  form.dependente ? form.precCpDependente : form.precCpTitular ? `${form.precCpTitular}-${SUFIXO_TITULAR}` : ''
+)
+
 function validar() {
   const erros = {}
-  if (!form.precCp.trim()) erros.precCp = 'Informe o Prec-CP.'
+  if (form.nome.trim().length < 3) erros.nome = 'Informe seu nome completo.'
   if (!form.dataNascimento) erros.dataNascimento = 'Informe a data de nascimento.'
+  if (form.dependente) {
+    if (!precCpValido(form.precCpDependente)) erros.precCp = 'Use o formato 123456789-01.'
+    else if (ehTitular(form.precCpDependente)) erros.precCp = 'O final -00 é do beneficiário principal.'
+    if (!cpfValido(form.cpfResponsavel)) erros.cpfResponsavel = 'CPF inválido.'
+    else if (somenteDigitos(form.cpfResponsavel) === somenteDigitos(form.cpf)) {
+      erros.cpfResponsavel = 'Informe o CPF do responsável, não o seu.'
+    }
+  } else if (form.precCpTitular.length !== 9) {
+    erros.precCp = 'O Prec-CP tem 9 números antes do -00.'
+  }
   if (!cpfValido(form.cpf)) erros.cpf = 'CPF inválido.'
   if (form.senha.length < 8) erros.senha = 'A senha precisa ter pelo menos 8 caracteres.'
   if (form.confirmarSenha !== form.senha) erros.confirmarSenha = 'As senhas não conferem.'
@@ -34,8 +62,11 @@ async function enviar() {
   carregando.value = true
   try {
     cadastrado.value = await cadastrarBeneficiario({
-      precCp: form.precCp.trim(),
+      nome: form.nome.trim(),
+      precCp: precCp.value,
       dataNascimento: form.dataNascimento,
+      dependente: form.dependente,
+      cpfResponsavel: form.dependente ? somenteDigitos(form.cpfResponsavel) : null,
       cpf: somenteDigitos(form.cpf),
       senha: form.senha
     })
@@ -44,6 +75,14 @@ async function enviar() {
   } finally {
     carregando.value = false
   }
+}
+
+// Ao virar dependente, já sugere o início do Prec-CP digitado como titular.
+function trocarTipo(dependente) {
+  form.dependente = dependente
+  errosCampo.value = {}
+  if (dependente && !form.precCpDependente && form.precCpTitular) form.precCpDependente = `${form.precCpTitular}-`
+  if (!dependente && !form.precCpTitular && form.precCpDependente) form.precCpTitular = basePrecCp(form.precCpDependente)
 }
 </script>
 
@@ -54,8 +93,7 @@ async function enviar() {
         <p class="marca">FUSEx · Guias</p>
         <h1 class="fx-titulo">Cadastro do beneficiário</h1>
         <p class="fx-subtitulo">
-          Informe seu Prec-CP e sua data de nascimento como estão no FUSEx. Conferimos esses dados
-          antes de liberar o acesso.
+          Crie seu acesso com o seu Prec-CP. Dependente informa também o CPF do beneficiário principal.
         </p>
       </header>
 
@@ -70,10 +108,49 @@ async function enviar() {
         <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
 
         <h2 class="fx-secao-titulo">1. Seus dados no FUSEx</h2>
+        <div class="fx-checks" role="radiogroup" aria-label="Tipo de beneficiário">
+          <label class="fx-check">
+            <input type="radio" name="tipo" :checked="!form.dependente" @change="trocarTipo(false)" />
+            Beneficiário principal (titular)
+          </label>
+          <label class="fx-check">
+            <input type="radio" name="tipo" :checked="form.dependente" @change="trocarTipo(true)" />
+            Sou dependente
+          </label>
+        </div>
+        <label class="fx-campo">
+          Nome completo
+          <input v-model="form.nome" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.nome }" maxlength="150" autocomplete="name" />
+          <span v-if="errosCampo.nome" class="fx-erro-campo">{{ errosCampo.nome }}</span>
+        </label>
         <div class="fx-grade">
-          <label class="fx-campo">
+          <label v-if="!form.dependente" class="fx-campo">
             Prec-CP
-            <input v-model="form.precCp" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.precCp }" inputmode="numeric" />
+            <span class="com-sufixo">
+              <input
+                :value="form.precCpTitular"
+                class="fx-entrada fx-mono"
+                :class="{ 'fx-entrada-erro': errosCampo.precCp }"
+                inputmode="numeric"
+                maxlength="9"
+                placeholder="123456789"
+                @input="form.precCpTitular = somenteDigitos($event.target.value).slice(0, 9); $event.target.value = form.precCpTitular"
+              />
+              <span class="sufixo fx-mono">-{{ SUFIXO_TITULAR }}</span>
+            </span>
+            <span v-if="errosCampo.precCp" class="fx-erro-campo">{{ errosCampo.precCp }}</span>
+          </label>
+          <label v-else class="fx-campo">
+            Prec-CP
+            <input
+              :value="form.precCpDependente"
+              class="fx-entrada fx-mono"
+              :class="{ 'fx-entrada-erro': errosCampo.precCp }"
+              inputmode="numeric"
+              maxlength="12"
+              placeholder="123456789-01"
+              @input="form.precCpDependente = formatarPrecCp($event.target.value); $event.target.value = form.precCpDependente"
+            />
             <span v-if="errosCampo.precCp" class="fx-erro-campo">{{ errosCampo.precCp }}</span>
           </label>
           <label class="fx-campo">
@@ -82,6 +159,24 @@ async function enviar() {
             <span v-if="errosCampo.dataNascimento" class="fx-erro-campo">{{ errosCampo.dataNascimento }}</span>
           </label>
         </div>
+        <template v-if="form.dependente">
+          <label class="fx-campo">
+            CPF do responsável (beneficiário principal)
+            <input
+              :value="form.cpfResponsavel"
+              class="fx-entrada"
+              :class="{ 'fx-entrada-erro': errosCampo.cpfResponsavel }"
+              inputmode="numeric"
+              placeholder="000.000.000-00"
+              @input="form.cpfResponsavel = formatarCpf($event.target.value)"
+            />
+            <span v-if="errosCampo.cpfResponsavel" class="fx-erro-campo">{{ errosCampo.cpfResponsavel }}</span>
+          </label>
+          <p class="fx-suave">
+            O seu Prec-CP começa igual ao do responsável e termina em -01, -02... O responsável precisa já ter
+            feito o cadastro dele.
+          </p>
+        </template>
 
         <h2 class="fx-secao-titulo">2. Seu acesso</h2>
         <div class="fx-grade">
@@ -131,6 +226,16 @@ async function enviar() {
   margin: 0 0 0.75rem;
   font-weight: 700;
   color: var(--fx-verde);
+}
+
+.com-sufixo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sufixo {
+  font-weight: 600;
 }
 
 .link-botao {
