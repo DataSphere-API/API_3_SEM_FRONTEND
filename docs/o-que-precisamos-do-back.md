@@ -66,11 +66,15 @@ mostra `cargo · nome da OCS`.
 
 ## 2. Criação de usuários
 
+**Onde o usuário nasce:** o login (`Usuario`) de **militar ou beneficiário nasce num lugar só, no autocadastro**,
+com a senha criada pela própria pessoa. O chefe **não cria login de militar**: só dá perfis a quem já tem acesso.
+A única exceção é o **funcionário de OCS**, que não está na tabela `Beneficiario` e por isso é cadastrado pelo chefe.
+
 | | O quê | Por quê |
 |---|---|---|
 | 🆕 | `POST /auth/cadastro` (sem login) com `{ precCp, dataNascimento, cpf, senha }`. Confere Prec-CP + data de nascimento na tabela `Beneficiario`, cria o `Usuario` e preenche `Beneficiario.Usuario_ID`. Resposta `{ id, nome }`. Erros: 422 `BENEFICIARIO_NAO_CONFERE`, 409 `BENEFICIARIO_JA_CADASTRADO`, 409 `CPF_JA_CADASTRADO` | O beneficiário se cadastra sozinho (decisão da reunião) |
 | 🆕 | `GET /usuarios` → lista no formato do `usuario` do login | Tela do chefe |
-| 🆕 | `POST /usuarios` — militar: `{ tipo: "MILITAR", precCp, cpf, senha, perfis: ["MEDICO", ...], crm }` → cria as linhas em `Medico`/`Analista`/`Chefe_Fusex`/`Auditor` pelo `Benef_ID`. **Se o Prec-CP já tem usuário, só acrescenta os perfis — nesse caso o front não manda `cpf` nem `senha`** (o login e a senha continuam os da pessoa). Funcionário de OCS: `{ tipo: "OCS", cpf, senha, ocsCnpj, cargo }` → linha em `FunOcs`. Erros: 404 `BENEFICIARIO_NAO_ENCONTRADO`, 409 `CPF_JA_CADASTRADO`, 422 `PERFIL_OBRIGATORIO`, 422 `MEDICO_SEM_CRM`, 422 `OCS_NAO_ENCONTRADA` | Escopo: chefe cadastra emissor e médico |
+| 🆕 | `POST /usuarios` — **militar: só acrescenta perfis** `{ tipo: "MILITAR", precCp, perfis: ["MEDICO", ...], crm }` → cria as linhas em `Medico`/`Analista`/`Chefe_Fusex`/`Auditor` pelo `Benef_ID`. O militar **precisa já ter feito o primeiro acesso** (autocadastro); senão 422 `PRIMEIRO_ACESSO_PENDENTE`. **Funcionário de OCS** (não é beneficiário, então não tem autocadastro): `{ tipo: "OCS", cpf, senha, ocsCnpj, cargo }` → cria o `Usuario` e a linha em `FunOcs`. Erros: 404 `BENEFICIARIO_NAO_ENCONTRADO`, 409 `CPF_JA_CADASTRADO`, 422 `PERFIL_OBRIGATORIO`, 422 `MEDICO_SEM_CRM`, 422 `OCS_NAO_ENCONTRADA` | Escopo: chefe cadastra emissor e médico |
 | 🆕 | `GET /medicos` → `[{ id, nome, crm }]` (o `id` é o do usuário) | O emissor escolhe o médico responsável |
 | 🆕 | `GET /beneficiarios?busca=` → `[{ precCp, nome, dataNascimento, dependente, ug }]` (nome ou Prec-CP) | Escolher o paciente e o militar |
 

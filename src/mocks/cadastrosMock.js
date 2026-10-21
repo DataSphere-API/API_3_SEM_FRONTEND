@@ -11,8 +11,9 @@ export async function mockListarUsuarios() {
   return banco().usuarios.map(usuarioPublico)
 }
 
-// tipo MILITAR: { precCp, cpf, senha, perfis, crm } — perfis viram linhas em Chefe_Fusex/Medico/Analista/Auditor.
-// tipo OCS: { cpf, senha, ocsCnpj, cargo } — vira uma linha em FunOcs.
+// tipo MILITAR: { precCp, perfis, crm } — só acrescenta perfis (linhas em Chefe_Fusex/Medico/Analista/Auditor)
+// a quem já fez o primeiro acesso: o login do militar nasce no autocadastro (POST /auth/cadastro).
+// tipo OCS: { cpf, senha, ocsCnpj, cargo } — cria o Usuario e a linha em FunOcs.
 export async function mockCriarUsuario(dados) {
   await esperar(400)
   const db = banco()
@@ -50,30 +51,17 @@ export async function mockCriarUsuario(dados) {
     throw erroHttp(422, { codigo: 'MEDICO_SEM_CRM', mensagem: 'Médico precisa de CRM.' })
   }
 
-  // Prec-CP que já tem usuário (ex.: beneficiário que se cadastrou): só acrescenta os perfis.
   const existente = db.usuarios.find(u => u.precCp === dados.precCp)
-  if (existente) {
-    existente.perfis = [...new Set([...existente.perfis, ...perfis, 'BENEFICIARIO'])]
-    if (perfis.includes('MEDICO')) existente.crm = dados.crm
-    persistir()
-    return usuarioPublico(existente)
+  if (!existente) {
+    throw erroHttp(422, {
+      codigo: 'PRIMEIRO_ACESSO_PENDENTE',
+      mensagem: 'Esta pessoa ainda não fez o primeiro acesso. Peça para ela se cadastrar em "Cadastre-se".'
+    })
   }
-  if (db.usuarios.some(u => u.cpf === dados.cpf)) {
-    throw erroHttp(409, { codigo: 'CPF_JA_CADASTRADO', mensagem: 'Já existe um usuário com este CPF.' })
-  }
-  const novo = {
-    id: proximoId(db.usuarios),
-    cpf: dados.cpf,
-    senha: dados.senha,
-    perfis: [...perfis, 'BENEFICIARIO'],
-    precCp: dados.precCp,
-    crm: perfis.includes('MEDICO') ? dados.crm : '',
-    ocsCnpj: '',
-    cargo: ''
-  }
-  db.usuarios.push(novo)
+  existente.perfis = [...new Set([...existente.perfis, ...perfis])]
+  if (perfis.includes('MEDICO')) existente.crm = dados.crm
   persistir()
-  return usuarioPublico(novo)
+  return usuarioPublico(existente)
 }
 
 export async function mockListarMedicos() {

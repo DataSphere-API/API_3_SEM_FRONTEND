@@ -48,6 +48,8 @@ async function carregar() {
 function abrirFormulario() {
   aviso.value = ''
   formularioAberto.value = true
+  // Recarrega para ver quem fez o primeiro acesso depois que a tela abriu.
+  carregar()
 }
 
 function aoSalvar(usuario) {
@@ -66,7 +68,8 @@ onMounted(carregar)
         <div>
           <h1 class="fx-titulo">Usuários e perfis</h1>
           <p class="fx-subtitulo">
-            Cadastre a equipe do FUSEx e das OCS. Beneficiários se cadastram sozinhos pelo login.
+            Dê os perfis da equipe do FUSEx e cadastre os funcionários das OCS. Militares e beneficiários criam o
+            próprio acesso em "Cadastre-se", na tela de login.
           </p>
         </div>
         <button type="button" class="fx-botao" @click="abrirFormulario">Novo usuário</button>

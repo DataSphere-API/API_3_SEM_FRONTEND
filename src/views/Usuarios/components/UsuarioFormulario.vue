@@ -30,11 +30,13 @@ const errosCampo = ref({})
 const erro = ref('')
 const salvando = ref(false)
 
-// Militar que já entra no sistema (ex.: beneficiário que se cadastrou): só ganha os perfis novos,
-// o login e a senha continuam os dele.
-const acessoExistente = computed(() =>
-  form.tipo === 'MILITAR' && militar.value ? props.usuarios.find(u => u.precCp === militar.value.precCp) || null : null
-)
+// O login do militar nasce no autocadastro (Prec-CP + nascimento). Aqui o chefe só acrescenta perfis
+// a quem já tem acesso; CPF e senha só são pedidos para funcionário de OCS, que não é beneficiário.
+function acessoDe(precCp) {
+  return props.usuarios.find(u => u.precCp === precCp) || null
+}
+const acessoExistente = computed(() => (form.tipo === 'MILITAR' && militar.value ? acessoDe(militar.value.precCp) : null))
+const semPrimeiroAcesso = computed(() => form.tipo === 'MILITAR' && Boolean(militar.value) && !acessoExistente.value)
 
 async function pesquisar() {
   if (!busca.value.trim()) return
@@ -57,17 +59,16 @@ function escolher(b) {
 
 function validar() {
   const erros = {}
-  if (!acessoExistente.value) {
-    if (!cpfValido(form.cpf)) erros.cpf = 'CPF inválido.'
-    if (form.senha.length < 8) erros.senha = 'Mínimo de 8 caracteres.'
-  }
   if (form.tipo === 'MILITAR') {
     if (!militar.value) erros.militar = 'Escolha a pessoa pelo nome ou Prec-CP.'
+    else if (semPrimeiroAcesso.value) erros.militar = 'Esta pessoa ainda não fez o primeiro acesso.'
     if (form.perfis.length === 0) erros.perfis = 'Marque pelo menos um perfil.'
     if (form.perfis.includes('MEDICO') && !form.crm.trim()) erros.crm = 'Médico precisa de CRM.'
   } else {
     if (!form.ocsCnpj) erros.ocsCnpj = 'Escolha a OCS.'
     if (!form.cargo.trim()) erros.cargo = 'Informe o cargo.'
+    if (!cpfValido(form.cpf)) erros.cpf = 'CPF inválido.'
+    if (form.senha.length < 8) erros.senha = 'Mínimo de 8 caracteres.'
   }
   errosCampo.value = erros
   return Object.keys(erros).length === 0
@@ -77,13 +78,10 @@ async function salvar() {
   erro.value = ''
   if (!validar()) return
 
-  const base = acessoExistente.value
-    ? { tipo: form.tipo }
-    : { tipo: form.tipo, cpf: somenteDigitos(form.cpf), senha: form.senha }
   const dados =
     form.tipo === 'MILITAR'
-      ? { ...base, precCp: militar.value.precCp, perfis: form.perfis, crm: form.crm.trim() }
-      : { ...base, ocsCnpj: form.ocsCnpj, cargo: form.cargo.trim() }
+      ? { tipo: 'MILITAR', precCp: militar.value.precCp, perfis: form.perfis, crm: form.crm.trim() }
+      : { tipo: 'OCS', cpf: somenteDigitos(form.cpf), senha: form.senha, ocsCnpj: form.ocsCnpj, cargo: form.cargo.trim() }
 
   salvando.value = true
   try {
@@ -132,7 +130,12 @@ async function salvar() {
             ({{ acessoExistente.perfis.map(rotuloPerfil).join(', ') }}). Os perfis marcados abaixo serão
             acrescentados; o login e a senha continuam os mesmos.
           </p>
-          <template v-else>
+          <p v-else-if="semPrimeiroAcesso" class="fx-alerta fx-alerta-ambar" role="alert">
+            {{ militar.nome }} ainda não fez o primeiro acesso. Peça para entrar em <strong>Cadastre-se</strong>,
+            na tela de login, com o Prec-CP e a data de nascimento e criar a própria senha. Depois volte aqui
+            para dar os perfis.
+          </p>
+          <template v-if="!militar">
             <div class="busca">
               <label class="fx-campo">
                 Buscar pelo nome ou Prec-CP
@@ -150,31 +153,36 @@ async function salvar() {
               <li v-for="b in resultadosBusca" :key="b.precCp">
                 <button type="button" class="resultado" @click="escolher(b)">
                   <strong>{{ b.nome }}</strong>
-                  <span class="fx-suave fx-mono">Prec-CP {{ b.precCp }}</span>
+                  <span class="fx-suave">
+                    <span class="fx-mono">Prec-CP {{ b.precCp }}</span> ·
+                    {{ acessoDe(b.precCp) ? 'já tem acesso' : 'ainda não fez o primeiro acesso' }}
+                  </span>
                 </button>
               </li>
             </ul>
             <p class="fx-suave">O nome vem do cadastro de beneficiários do FUSEx.</p>
           </template>
 
-          <h3 class="fx-secao-titulo">2. Perfis</h3>
-          <div class="fx-checks">
-            <label v-for="perfil in PERFIS_DE_MILITAR" :key="perfil" class="fx-check">
-              <input
-                v-model="form.perfis"
-                type="checkbox"
-                :value="perfil"
-                :disabled="acessoExistente?.perfis.includes(perfil)"
-              />
-              {{ PERFIS[perfil].rotulo }}
+          <template v-if="!semPrimeiroAcesso">
+            <h3 class="fx-secao-titulo">2. Perfis</h3>
+            <div class="fx-checks">
+              <label v-for="perfil in PERFIS_DE_MILITAR" :key="perfil" class="fx-check">
+                <input
+                  v-model="form.perfis"
+                  type="checkbox"
+                  :value="perfil"
+                  :disabled="acessoExistente?.perfis.includes(perfil)"
+                />
+                {{ PERFIS[perfil].rotulo }}
+              </label>
+            </div>
+            <span v-if="errosCampo.perfis" class="fx-erro-campo">{{ errosCampo.perfis }}</span>
+            <label v-if="form.perfis.includes('MEDICO')" class="fx-campo">
+              CRM
+              <input v-model="form.crm" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.crm }" inputmode="numeric" />
+              <span v-if="errosCampo.crm" class="fx-erro-campo">{{ errosCampo.crm }}</span>
             </label>
-          </div>
-          <span v-if="errosCampo.perfis" class="fx-erro-campo">{{ errosCampo.perfis }}</span>
-          <label v-if="form.perfis.includes('MEDICO')" class="fx-campo">
-            CRM
-            <input v-model="form.crm" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.crm }" inputmode="numeric" />
-            <span v-if="errosCampo.crm" class="fx-erro-campo">{{ errosCampo.crm }}</span>
-          </label>
+          </template>
         </template>
 
         <template v-else>
@@ -196,8 +204,8 @@ async function salvar() {
           </div>
         </template>
 
-        <template v-if="!acessoExistente">
-          <h3 class="fx-secao-titulo">{{ form.tipo === 'MILITAR' ? '3' : '2' }}. Acesso</h3>
+        <template v-if="form.tipo === 'OCS'">
+          <h3 class="fx-secao-titulo">2. Acesso</h3>
           <div class="fx-grade">
             <label class="fx-campo">
               CPF (login)
@@ -221,7 +229,7 @@ async function salvar() {
 
       <div class="fx-modal-rodape">
         <button type="button" class="fx-botao-secundario" @click="emit('fechar')">Cancelar</button>
-        <button type="submit" class="fx-botao" :disabled="salvando">
+        <button type="submit" class="fx-botao" :disabled="salvando || semPrimeiroAcesso">
           {{ salvando ? 'Salvando...' : 'Cadastrar usuário' }}
         </button>
       </div>

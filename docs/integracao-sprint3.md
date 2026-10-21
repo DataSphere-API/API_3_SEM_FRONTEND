@@ -162,6 +162,8 @@ Nenhuma tela muda de cara: as adaptações ficam nos *services*.
 > **B2 · US000-17 Usuários, médicos e busca de beneficiários P[5]**
 > `GET/POST /usuarios`, `GET /medicos`, `GET /beneficiarios?busca=` (contratos na seção 2 do
 > `o-que-precisamos-do-back.md`).
+> O `POST /usuarios` **não cria login de militar**: só acrescenta perfis a quem já fez o autocadastro
+> (B1). Login com CPF e senha pelo chefe só para funcionário de OCS.
 
 > **B3 · US000-18 OCS, procedimentos e contratos P[4]**
 > `GET/POST /ocs`, `GET/POST /procedimentos`, `GET/POST /contratos`. Só listar e cadastrar.
