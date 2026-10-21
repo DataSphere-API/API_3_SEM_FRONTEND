@@ -2,44 +2,75 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import PreGuiaResumo from '../../components/PreGuiaResumo.vue'
-import { listarPreGuiasDoFluxo } from '../../services/fluxoPreGuiaService.js'
+import {
+  listarPreGuiasDoFluxo,
+  buscarPreGuiaDoFluxo,
+  enviarParaAprovacao
+} from '../../services/fluxoPreGuiaService.js'
+import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
-import { seloDecisao, seloStatus } from '../../utils/fluxoPreGuia.js'
+import { EDITAVEIS, numeroPreGuia, seloAprovacao, seloStatus } from '../../utils/fluxoPreGuia.js'
 
 const route = useRoute()
 
 const FILTROS = [
-  { valor: 'ABERTAS', rotulo: 'Em andamento' },
-  { valor: 'DEVOLVIDA', rotulo: 'Devolvidas' },
-  { valor: 'REPROVADA', rotulo: 'Negadas' },
-  { valor: 'TODAS', rotulo: 'Todas' }
+  { valor: 'ABERTAS', rotulo: 'Em andamento', status: ['PRE_GUIA', 'COM_PENDENCIAS', 'VALIDADA'] },
+  { valor: 'COM_PENDENCIAS', rotulo: 'Com pendências', status: ['COM_PENDENCIAS'] },
+  { valor: 'REPROVADA', rotulo: 'Reprovadas', status: ['REPROVADA'] },
+  { valor: 'TODAS', rotulo: 'Todas', status: null }
 ]
 
 const preGuias = ref([])
 const carregando = ref(false)
 const erro = ref('')
+const aviso = ref(route.query.salva ? `${numeroPreGuia(route.query.salva)} salva como rascunho.` : '')
+const avisoTom = ref('verde')
 const filtro = ref('ABERTAS')
 const detalhe = ref(null)
+const enviando = ref(null)
 
 const lista = computed(() => {
-  if (filtro.value === 'TODAS') return preGuias.value
-  if (filtro.value === 'ABERTAS') {
-    return preGuias.value.filter(p => ['AGUARDANDO_APROVACAO', 'DEVOLVIDA'].includes(p.status))
-  }
-  return preGuias.value.filter(p => p.status === filtro.value)
+  const status = FILTROS.find(f => f.valor === filtro.value).status
+  return status ? preGuias.value.filter(p => status.includes(p.status)) : preGuias.value
 })
 
-const devolvidas = computed(() => preGuias.value.filter(p => p.status === 'DEVOLVIDA').length)
+const comPendencias = computed(() => preGuias.value.filter(p => p.status === 'COM_PENDENCIAS').length)
 
 async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    preGuias.value = (await listarPreGuiasDoFluxo()).sort((a, b) => b.criadaEm.localeCompare(a.criadaEm))
+    preGuias.value = (await listarPreGuiasDoFluxo()).sort((a, b) => b.id - a.id)
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar as pré-guias.'
   } finally {
     carregando.value = false
+  }
+}
+
+async function enviar(p) {
+  aviso.value = ''
+  enviando.value = p.id
+  try {
+    const resultado = await enviarParaAprovacao(p.id)
+    avisoTom.value = resultado.validada ? 'verde' : 'ambar'
+    aviso.value = resultado.validada
+      ? `${numeroPreGuia(p.id)} enviada para o Médico e para o Chefe do FUSEx.`
+      : `${numeroPreGuia(p.id)} ficou com pendências: ${resultado.pendencias.map(x => x.mensagem).join('; ')}.`
+    await carregar()
+  } catch (e) {
+    avisoTom.value = 'vermelho'
+    aviso.value = e.mensagemUsuario || 'Não foi possível enviar.'
+  } finally {
+    enviando.value = null
+  }
+}
+
+async function abrirDetalhe(id) {
+  try {
+    detalhe.value = await buscarPreGuiaDoFluxo(id)
+  } catch (e) {
+    erro.value = e.mensagemUsuario || 'Não foi possível abrir a pré-guia.'
   }
 }
 
@@ -52,16 +83,14 @@ onMounted(carregar)
       <header class="fx-topo-pagina">
         <div>
           <h1 class="fx-titulo">Acompanhamento das pré-guias</h1>
-          <p class="fx-subtitulo">Situação de cada pré-guia com o Médico e com o Chefe do FUSEx.</p>
+          <p class="fx-subtitulo">Rascunhos, pendências e a situação de cada pré-guia com o Médico e o Chefe do FUSEx.</p>
         </div>
         <router-link to="/emissor/pre-guias/nova" class="fx-botao link-botao">Criar pré-guia</router-link>
       </header>
 
-      <p v-if="route.query.reenviada" class="fx-alerta fx-alerta-verde" role="status">
-        Pré-guia {{ route.query.reenviada }} corrigida e reenviada para aprovação.
-      </p>
-      <p v-if="devolvidas" class="fx-alerta fx-alerta-ambar">
-        {{ devolvidas }} pré-guia(s) devolvida(s) aguardando sua correção.
+      <p v-if="aviso" class="fx-alerta" :class="`fx-alerta-${avisoTom}`" role="status">{{ aviso }}</p>
+      <p v-if="comPendencias" class="fx-alerta fx-alerta-ambar">
+        {{ comPendencias }} pré-guia(s) com pendências aguardando sua correção.
       </p>
 
       <div class="filtros">
@@ -86,8 +115,8 @@ onMounted(carregar)
             <tr>
               <th>Pré-guia</th>
               <th>Beneficiário</th>
-              <th>Exame</th>
-              <th>Enviada</th>
+              <th>Procedimentos</th>
+              <th>Criada</th>
               <th>Médico</th>
               <th>Chefe do FUSEx</th>
               <th>Situação</th>
@@ -96,32 +125,31 @@ onMounted(carregar)
           </thead>
           <tbody>
             <tr v-for="p in lista" :key="p.id">
-              <td class="fx-mono">{{ p.numero }}</td>
-              <td>{{ p.beneficiario.nome }}</td>
-              <td>{{ p.procedimentos.map(x => x.nome).join(', ') }}</td>
-              <td>{{ formatarData(p.criadaEm) }}</td>
+              <td class="fx-mono">{{ numeroPreGuia(p.id) }}</td>
+              <td>{{ p.beneficiarioNome }}</td>
+              <td>{{ p.qtdProcedimentos }} · {{ formatarMoeda(p.valorTotal) }}</td>
+              <td>{{ formatarData(p.dataCriacao) }}</td>
               <td>
-                <span class="fx-selo" :class="seloDecisao(p.aprovacaoMedico.decisao).classe">
-                  {{ seloDecisao(p.aprovacaoMedico.decisao).texto }}
+                <span class="fx-selo" :class="seloAprovacao(p.status, p.medicoAprovou).classe">
+                  {{ seloAprovacao(p.status, p.medicoAprovou).texto }}
                 </span>
               </td>
               <td>
-                <span class="fx-selo" :class="seloDecisao(p.aprovacaoChefe.decisao).classe">
-                  {{ seloDecisao(p.aprovacaoChefe.decisao).texto }}
+                <span class="fx-selo" :class="seloAprovacao(p.status, p.chefeAprovou).classe">
+                  {{ seloAprovacao(p.status, p.chefeAprovou).texto }}
                 </span>
               </td>
               <td>
                 <span class="fx-selo" :class="seloStatus(p.status).classe">{{ seloStatus(p.status).texto }}</span>
               </td>
               <td class="acoes">
-                <router-link
-                  v-if="p.status === 'DEVOLVIDA'"
-                  :to="`/emissor/pre-guias/${p.id}/corrigir`"
-                  class="fx-botao link-botao"
-                >
-                  Corrigir
-                </router-link>
-                <button type="button" class="fx-botao-secundario" @click="detalhe = p">Detalhes</button>
+                <template v-if="EDITAVEIS.includes(p.status)">
+                  <button type="button" class="fx-botao" :disabled="enviando === p.id" @click="enviar(p)">
+                    {{ enviando === p.id ? 'Enviando...' : 'Enviar' }}
+                  </button>
+                  <router-link :to="`/emissor/pre-guias/${p.id}/editar`" class="fx-botao-secundario link-botao">Editar</router-link>
+                </template>
+                <button type="button" class="fx-botao-secundario" @click="abrirDetalhe(p.id)">Detalhes</button>
               </td>
             </tr>
             <tr v-if="lista.length === 0">

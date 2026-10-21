@@ -1,10 +1,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import PreGuiaResumo from '../../components/PreGuiaResumo.vue'
-import { listarPreGuiasDoFluxo, emitirGuia } from '../../services/fluxoPreGuiaService.js'
+import { listarPreGuiasDoFluxo, buscarPreGuiaDoFluxo, emitirGuia } from '../../services/fluxoPreGuiaService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
-import { CARATER } from '../../utils/fluxoPreGuia.js'
+import { numeroPreGuia, somarDias, VALIDADE_DIAS } from '../../utils/fluxoPreGuia.js'
 
 const preGuias = ref([])
 const carregando = ref(false)
@@ -14,13 +14,9 @@ const erroEmissao = ref('')
 const emitindo = ref(null)
 const aberta = ref(null)
 
-const prontas = computed(() =>
-  preGuias.value
-    .filter(p => p.status === 'APROVADA')
-    .sort((a, b) => (a.carater === 'URGENCIA' ? 0 : 1) - (b.carater === 'URGENCIA' ? 0 : 1))
-)
+const prontas = computed(() => preGuias.value.filter(p => p.status === 'APROVADA'))
 const emitidas = computed(() =>
-  preGuias.value.filter(p => p.status === 'EMITIDA').sort((a, b) => b.dataEmissao.localeCompare(a.dataEmissao))
+  preGuias.value.filter(p => p.status === 'EMITIDA').sort((a, b) => (b.dataEmissao || '').localeCompare(a.dataEmissao || ''))
 )
 
 async function carregar() {
@@ -35,13 +31,25 @@ async function carregar() {
   }
 }
 
-async function emitir(preGuia) {
+async function alternar(id) {
+  if (aberta.value?.id === id) {
+    aberta.value = null
+    return
+  }
+  try {
+    aberta.value = await buscarPreGuiaDoFluxo(id)
+  } catch (e) {
+    erroEmissao.value = e.mensagemUsuario || 'Não foi possível abrir a pré-guia.'
+  }
+}
+
+async function emitir(id) {
   aviso.value = ''
   erroEmissao.value = ''
-  emitindo.value = preGuia.id
+  emitindo.value = id
   try {
-    const guia = await emitirGuia(preGuia.id)
-    aviso.value = `Guia ${preGuia.numero} emitida em ${formatarData(guia.dataEmissao)}, válida até ${formatarData(guia.validoAte)}. O beneficiário já vê a guia no app.`
+    const guia = await emitirGuia(id)
+    aviso.value = `Guia ${numeroPreGuia(id)} emitida em ${formatarData(guia.dataEmissao)}, válida até ${formatarData(guia.validoAte)}. Os atendimentos já aparecem para as OCS.`
     aberta.value = null
     await carregar()
   } catch (e) {
@@ -60,7 +68,7 @@ onMounted(carregar)
       <header>
         <h1 class="fx-titulo">Pré-guias aprovadas</h1>
         <p class="fx-subtitulo">
-          Aprovadas pelo Médico e pelo Chefe do FUSEx. Emita a guia de encaminhamento; ela vale por 60 dias.
+          Aprovadas pelo Médico e pelo Chefe do FUSEx. Emita a guia; ela vale por {{ VALIDADE_DIAS }} dias.
         </p>
       </header>
 
@@ -75,27 +83,19 @@ onMounted(carregar)
 
         <ul class="fx-lista">
           <li v-for="p in prontas" :key="p.id" class="fx-cartao">
-            <template v-if="aberta === p.id">
-              <PreGuiaResumo :pre-guia="p" />
-            </template>
+            <PreGuiaResumo v-if="aberta?.id === p.id" :pre-guia="aberta" />
             <template v-else>
-              <div class="topo">
-                <span class="fx-mono"><strong>{{ p.numero }}</strong></span>
-                <span v-if="p.carater === 'URGENCIA'" class="fx-selo fx-selo-vermelho">{{ CARATER.URGENCIA }}</span>
-              </div>
+              <span class="fx-mono"><strong>{{ numeroPreGuia(p.id) }}</strong></span>
               <p class="linha">
-                <strong>{{ p.beneficiario.nome }}</strong> · {{ p.procedimentos.map(x => `${x.nome} (${x.ocs.nome})`).join(', ') }}
-              </p>
-              <p class="fx-suave linha">
-                Médico: {{ p.aprovacaoMedico.por }} · Chefe: {{ p.aprovacaoChefe.por }} · {{ formatarMoeda(p.valorTotal) }}
+                <strong>{{ p.beneficiarioNome }}</strong> · {{ p.qtdProcedimentos }} procedimento(s) · {{ formatarMoeda(p.valorTotal) }}
               </p>
             </template>
             <div class="fx-acoes rodape">
-              <button type="button" class="fx-botao" :disabled="emitindo === p.id" @click="emitir(p)">
+              <button type="button" class="fx-botao" :disabled="emitindo === p.id" @click="emitir(p.id)">
                 {{ emitindo === p.id ? 'Emitindo...' : 'Emitir guia' }}
               </button>
-              <button type="button" class="fx-botao-secundario" @click="aberta = aberta === p.id ? null : p.id">
-                {{ aberta === p.id ? 'Recolher' : 'Ver tudo' }}
+              <button type="button" class="fx-botao-secundario" @click="alternar(p.id)">
+                {{ aberta?.id === p.id ? 'Recolher' : 'Ver tudo' }}
               </button>
             </div>
           </li>
@@ -115,10 +115,10 @@ onMounted(carregar)
             </thead>
             <tbody>
               <tr v-for="p in emitidas" :key="p.id">
-                <td class="fx-mono">{{ p.numero }}</td>
-                <td>{{ p.beneficiario.nome }}</td>
+                <td class="fx-mono">{{ numeroPreGuia(p.id) }}</td>
+                <td>{{ p.beneficiarioNome }}</td>
                 <td>{{ formatarData(p.dataEmissao) }}</td>
-                <td>{{ formatarData(p.validoAte) }}</td>
+                <td>{{ p.dataEmissao ? formatarData(somarDias(p.dataEmissao, VALIDADE_DIAS)) : '—' }}</td>
                 <td class="fx-mono">{{ formatarMoeda(p.valorTotal) }}</td>
               </tr>
               <tr v-if="emitidas.length === 0">
@@ -133,13 +133,6 @@ onMounted(carregar)
 </template>
 
 <style scoped>
-.topo {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .linha {
   margin: 0;
   line-height: 1.4;
