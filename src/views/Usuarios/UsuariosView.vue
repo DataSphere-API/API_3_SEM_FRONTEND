@@ -113,6 +113,7 @@ onMounted(carregar)
     <UsuarioFormulario
       v-if="formularioAberto"
       :ocs="ocs"
+      :usuarios="usuarios"
       @fechar="formularioAberto = false"
       @salvo="aoSalvar"
     />

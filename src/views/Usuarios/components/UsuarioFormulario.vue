@@ -1,12 +1,13 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, computed } from 'vue'
 import { criarUsuario } from '../../../services/usuarioService.js'
 import { buscarBeneficiarios } from '../../../services/beneficiarioService.js'
-import { PERFIS, PERFIS_DE_MILITAR } from '../../../utils/perfis.js'
+import { PERFIS, PERFIS_DE_MILITAR, rotuloPerfil } from '../../../utils/perfis.js'
 import { cpfValido, formatarCpf, somenteDigitos } from '../../../utils/documentos.js'
 
-defineProps({
-  ocs: { type: Array, required: true }
+const props = defineProps({
+  ocs: { type: Array, required: true },
+  usuarios: { type: Array, required: true }
 })
 
 const emit = defineEmits(['fechar', 'salvo'])
@@ -29,6 +30,12 @@ const errosCampo = ref({})
 const erro = ref('')
 const salvando = ref(false)
 
+// Militar que já entra no sistema (ex.: beneficiário que se cadastrou): só ganha os perfis novos,
+// o login e a senha continuam os dele.
+const acessoExistente = computed(() =>
+  form.tipo === 'MILITAR' && militar.value ? props.usuarios.find(u => u.precCp === militar.value.precCp) || null : null
+)
+
 async function pesquisar() {
   if (!busca.value.trim()) return
   buscando.value = true
@@ -43,14 +50,17 @@ async function pesquisar() {
 
 function escolher(b) {
   militar.value = b
+  form.perfis = []
   resultadosBusca.value = []
   busca.value = ''
 }
 
 function validar() {
   const erros = {}
-  if (!cpfValido(form.cpf)) erros.cpf = 'CPF inválido.'
-  if (form.senha.length < 8) erros.senha = 'Mínimo de 8 caracteres.'
+  if (!acessoExistente.value) {
+    if (!cpfValido(form.cpf)) erros.cpf = 'CPF inválido.'
+    if (form.senha.length < 8) erros.senha = 'Mínimo de 8 caracteres.'
+  }
   if (form.tipo === 'MILITAR') {
     if (!militar.value) erros.militar = 'Escolha a pessoa pelo nome ou Prec-CP.'
     if (form.perfis.length === 0) erros.perfis = 'Marque pelo menos um perfil.'
@@ -67,7 +77,9 @@ async function salvar() {
   erro.value = ''
   if (!validar()) return
 
-  const base = { tipo: form.tipo, cpf: somenteDigitos(form.cpf), senha: form.senha }
+  const base = acessoExistente.value
+    ? { tipo: form.tipo }
+    : { tipo: form.tipo, cpf: somenteDigitos(form.cpf), senha: form.senha }
   const dados =
     form.tipo === 'MILITAR'
       ? { ...base, precCp: militar.value.precCp, perfis: form.perfis, crm: form.crm.trim() }
@@ -115,6 +127,11 @@ async function salvar() {
             <span><strong>{{ militar.nome }}</strong> <span class="fx-suave fx-mono">· Prec-CP {{ militar.precCp }}</span></span>
             <button type="button" class="fx-botao-secundario" @click="militar = null">Trocar</button>
           </div>
+          <p v-if="acessoExistente" class="fx-alerta fx-alerta-cinza">
+            Já tem acesso com o CPF <span class="fx-mono">{{ formatarCpf(acessoExistente.cpf) }}</span>
+            ({{ acessoExistente.perfis.map(rotuloPerfil).join(', ') }}). Os perfis marcados abaixo serão
+            acrescentados; o login e a senha continuam os mesmos.
+          </p>
           <template v-else>
             <div class="busca">
               <label class="fx-campo">
@@ -143,7 +160,12 @@ async function salvar() {
           <h3 class="fx-secao-titulo">2. Perfis</h3>
           <div class="fx-checks">
             <label v-for="perfil in PERFIS_DE_MILITAR" :key="perfil" class="fx-check">
-              <input v-model="form.perfis" type="checkbox" :value="perfil" />
+              <input
+                v-model="form.perfis"
+                type="checkbox"
+                :value="perfil"
+                :disabled="acessoExistente?.perfis.includes(perfil)"
+              />
               {{ PERFIS[perfil].rotulo }}
             </label>
           </div>
@@ -153,7 +175,6 @@ async function salvar() {
             <input v-model="form.crm" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.crm }" inputmode="numeric" />
             <span v-if="errosCampo.crm" class="fx-erro-campo">{{ errosCampo.crm }}</span>
           </label>
-          <p class="fx-suave">Se a pessoa já tem acesso (por exemplo, como beneficiária), os perfis são acrescentados ao login dela.</p>
         </template>
 
         <template v-else>
@@ -175,25 +196,27 @@ async function salvar() {
           </div>
         </template>
 
-        <h3 class="fx-secao-titulo">{{ form.tipo === 'MILITAR' ? '3' : '2' }}. Acesso</h3>
-        <div class="fx-grade">
-          <label class="fx-campo">
-            CPF (login)
-            <input
-              :value="form.cpf"
-              class="fx-entrada"
-              :class="{ 'fx-entrada-erro': errosCampo.cpf }"
-              inputmode="numeric"
-              @input="form.cpf = formatarCpf($event.target.value)"
-            />
-            <span v-if="errosCampo.cpf" class="fx-erro-campo">{{ errosCampo.cpf }}</span>
-          </label>
-          <label class="fx-campo">
-            Senha provisória
-            <input v-model="form.senha" type="text" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.senha }" autocomplete="off" />
-            <span v-if="errosCampo.senha" class="fx-erro-campo">{{ errosCampo.senha }}</span>
-          </label>
-        </div>
+        <template v-if="!acessoExistente">
+          <h3 class="fx-secao-titulo">{{ form.tipo === 'MILITAR' ? '3' : '2' }}. Acesso</h3>
+          <div class="fx-grade">
+            <label class="fx-campo">
+              CPF (login)
+              <input
+                :value="form.cpf"
+                class="fx-entrada"
+                :class="{ 'fx-entrada-erro': errosCampo.cpf }"
+                inputmode="numeric"
+                @input="form.cpf = formatarCpf($event.target.value)"
+              />
+              <span v-if="errosCampo.cpf" class="fx-erro-campo">{{ errosCampo.cpf }}</span>
+            </label>
+            <label class="fx-campo">
+              Senha provisória
+              <input v-model="form.senha" type="text" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.senha }" autocomplete="off" />
+              <span v-if="errosCampo.senha" class="fx-erro-campo">{{ errosCampo.senha }}</span>
+            </label>
+          </div>
+        </template>
       </div>
 
       <div class="fx-modal-rodape">
