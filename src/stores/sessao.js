@@ -1,10 +1,11 @@
 import { reactive, readonly } from 'vue'
 
+// sessionStorage: cada aba tem o seu login (dá para abrir OCS e beneficiário lado a lado).
 const CHAVE = 'fusex-sessao'
 
 function carregar() {
   try {
-    const salvo = JSON.parse(localStorage.getItem(CHAVE))
+    const salvo = JSON.parse(sessionStorage.getItem(CHAVE))
     if (salvo?.token && salvo?.usuario) return salvo
   } catch {
     // sessão corrompida ou storage bloqueado: começa deslogado
@@ -17,9 +18,9 @@ const estado = reactive(carregar())
 function salvar() {
   try {
     if (estado.token) {
-      localStorage.setItem(CHAVE, JSON.stringify(estado))
+      sessionStorage.setItem(CHAVE, JSON.stringify(estado))
     } else {
-      localStorage.removeItem(CHAVE)
+      sessionStorage.removeItem(CHAVE)
     }
   } catch {
     // sem storage a sessão vale só até recarregar a página

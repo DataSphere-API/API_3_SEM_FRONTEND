@@ -1,6 +1,6 @@
 // Banco em memória dos mocks das telas de acesso, cadastros e aprovação.
 // Fica salvo no localStorage para o fluxo continuar entre logins de perfis diferentes.
-const CHAVE = 'fusex-banco-mock'
+const CHAVE = 'fusex-banco-mock-v2'
 const SENHA_PADRAO = 'fusex123'
 
 function semente() {
@@ -48,7 +48,19 @@ function semente() {
       preGuiaSemente(1, '1001', 'AGUARDANDO_APROVACAO', [{ procedimentoId: 1, ocsCnpj: '12345678000199', quantidade: 1 }], { medico: 'PENDENTE', chefe: 'PENDENTE' }),
       preGuiaSemente(2, '7007', 'AGUARDANDO_APROVACAO', [{ procedimentoId: 4, ocsCnpj: '34567890000177', quantidade: 10 }], { medico: 'APROVADA', chefe: 'PENDENTE' }),
       preGuiaSemente(3, '123456', 'DEVOLVIDA', [{ procedimentoId: 6, ocsCnpj: '34567890000177', quantidade: 1 }], { medico: 'DEVOLVIDA', chefe: 'PENDENTE' }, 'Falta o CID e o laudo do exame anterior para justificar a eletroneuromiografia.'),
-      preGuiaSemente(4, '1001', 'APROVADA', [{ procedimentoId: 2, ocsCnpj: '23456789000188', quantidade: 1 }, { procedimentoId: 3, ocsCnpj: '12345678000199', quantidade: 1 }], { medico: 'APROVADA', chefe: 'APROVADA' })
+      preGuiaSemente(4, '1001', 'APROVADA', [{ procedimentoId: 2, ocsCnpj: '23456789000188', quantidade: 1 }, { procedimentoId: 3, ocsCnpj: '12345678000199', quantidade: 1 }], { medico: 'APROVADA', chefe: 'APROVADA' }),
+      {
+        ...preGuiaSemente(5, '1001', 'EMITIDA', [
+          { procedimentoId: 5, ocsCnpj: '12345678000199', quantidade: 3, atendimentoId: 501 },
+          { procedimentoId: 1, ocsCnpj: '12345678000199', quantidade: 1, atendimentoId: 502 }
+        ], { medico: 'APROVADA', chefe: 'APROVADA' }),
+        dataEmissao: '2026-10-16'
+      }
+    ],
+    // Check mútuo: a OCS registra a sessão e ela só conta depois que o beneficiário confirma.
+    // dataConfirmacao nula = aguardando o beneficiário.
+    sessoes: [
+      { id: 1, atendimentoId: 501, numeroSessao: 1, ocsCnpj: '12345678000199', dataRealizacao: '2026-10-17T10:00:00', dataConfirmacao: '2026-10-17T10:04:00' }
     ]
   }
 }
@@ -82,6 +94,11 @@ function preGuiaSemente(id, precCp, status, procedimentos, decisoes, observacao 
 }
 
 let estado = null
+
+// Outra aba gravou no banco mock: descarta a cópia em memória para ler de novo.
+window.addEventListener('storage', evento => {
+  if (evento.key === CHAVE) estado = null
+})
 
 export function banco() {
   if (!estado) {

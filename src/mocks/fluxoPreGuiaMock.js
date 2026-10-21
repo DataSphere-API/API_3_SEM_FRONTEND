@@ -2,7 +2,7 @@ import { banco, persistir, proximoId, copiar } from './bancoMock.js'
 import { erroHttp, esperar } from './auxiliares.js'
 import { sessao } from '../stores/sessao.js'
 
-const VALIDADE_DIAS = 60
+export const VALIDADE_DIAS = 60
 
 function hoje() {
   return new Date().toISOString().slice(0, 10)
@@ -18,7 +18,7 @@ function contratoVigente(procedimentoId, ocsCnpj, data = hoje()) {
   )
 }
 
-function somarDias(data, dias) {
+export function somarDias(data, dias) {
   const resultado = new Date(`${data}T00:00:00`)
   resultado.setDate(resultado.getDate() + dias)
   return resultado.toISOString().slice(0, 10)
@@ -219,6 +219,13 @@ export async function mockEmitirGuia(id) {
   if (preGuia.status !== 'APROVADA') {
     throw erroHttp(409, { codigo: 'PRE_GUIA_NAO_APROVADA', mensagem: 'A guia só pode ser emitida depois das duas aprovações.' })
   }
+  // Cada procedimento da guia emitida vira um atendimento para a OCS de destino.
+  let proximoAtendimento = banco().preGuias
+    .flatMap(p => p.procedimentos)
+    .reduce((maior, p) => Math.max(maior, p.atendimentoId || 0), 0)
+  preGuia.procedimentos.forEach(p => {
+    p.atendimentoId = ++proximoAtendimento
+  })
   preGuia.status = 'EMITIDA'
   preGuia.dataEmissao = hoje()
   persistir()
