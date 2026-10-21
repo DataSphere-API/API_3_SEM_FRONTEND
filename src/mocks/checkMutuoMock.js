@@ -1,14 +1,14 @@
-import { banco, persistir, proximoId, copiar } from './bancoMock.js'
+import { banco, persistir, proximoId, copiar, registrarHistorico } from './bancoMock.js'
 import { erroHttp, esperar } from './auxiliares.js'
-import { somarDias, VALIDADE_DIAS } from './fluxoPreGuiaMock.js'
 import { sessao } from '../stores/sessao.js'
+import { numeroPreGuia, somarDias, VALIDADE_DIAS } from '../utils/fluxoPreGuia.js'
 
 function hoje() {
   return new Date().toISOString().slice(0, 10)
 }
 
 // Monta a visão de cada procedimento de guia emitida, como o GET /ocs/{cnpj}/atendimentos devolveria.
-function atendimentos() {
+export function atendimentos() {
   const db = banco()
   return db.preGuias
     .filter(p => p.status === 'EMITIDA')
@@ -25,7 +25,7 @@ function atendimentos() {
         return {
           atendimentoId: p.atendimentoId,
           guiaId: guia.id,
-          guiaNumero: guia.numero,
+          guiaNumero: numeroPreGuia(guia.id),
           beneficiario: { precCp: guia.beneficiarioPrecCp, nome: beneficiario?.nome || '—' },
           procedimento: db.procedimentos.find(x => x.id === p.procedimentoId)?.nome || '—',
           ocs: { cnpj: p.ocsCnpj, nome: ocs?.nomeFantasia || '—' },
@@ -134,7 +134,13 @@ export async function mockConfirmarSessao(sessaoId) {
   await esperar(400)
   const pendente = encontrarSessaoPendente(sessaoId)
   validarDono(pendente)
+  const antes = encontrarAtendimento(pendente.atendimentoId)
   pendente.dataConfirmacao = new Date().toISOString()
+  const depois = encontrarAtendimento(pendente.atendimentoId)
+  const statusAntes = antes.qtdRealizada === 0 ? 'PENDENTE' : 'EM_ANDAMENTO'
+  if (depois.statusProcedimento === 'REALIZADA' || statusAntes === 'PENDENTE') {
+    registrarHistorico('GUIA_PROC', pendente.atendimentoId, statusAntes, depois.statusProcedimento, 'confirmacao-do-beneficiario')
+  }
   persistir()
   return copiar(encontrarAtendimento(pendente.atendimentoId))
 }
@@ -146,4 +152,37 @@ export async function mockRecusarSessao(sessaoId) {
   const db = banco()
   db.sessoes = db.sessoes.filter(s => s.id !== pendente.id)
   persistir()
+}
+
+// GET /beneficiarios/{precCp}/guias (#64), com qtdRealizada contando só sessões confirmadas.
+export async function mockListarGuiasDoBeneficiario(precCp) {
+  await esperar(300)
+  const db = banco()
+  if (!db.beneficiarios.some(b => b.precCp === precCp)) {
+    throw erroHttp(404, { codigo: 'BENEFICIARIO_NAO_ENCONTRADO', mensagem: 'Beneficiário não encontrado.' })
+  }
+  const lista = atendimentos().filter(a => a.beneficiario.precCp === precCp)
+  return db.preGuias
+    .filter(p => p.status === 'EMITIDA' && p.beneficiarioPrecCp === precCp)
+    .map(guia => {
+      const diasDesdeEmissao = Math.floor((new Date(hoje()) - new Date(guia.dataEmissao)) / 86400000)
+      return {
+        guiaId: guia.id,
+        numero: numeroPreGuia(guia.id),
+        status: 'EMITIDA',
+        dataEmissao: guia.dataEmissao,
+        diasRestantes: Math.max(VALIDADE_DIAS - diasDesdeEmissao, 0),
+        procedimentos: lista
+          .filter(a => a.guiaId === guia.id)
+          .map(a => ({
+            atendimentoId: a.atendimentoId,
+            nome: a.procedimento,
+            ocs: a.ocs,
+            status: a.statusProcedimento,
+            qtdAutorizada: a.qtdAutorizada,
+            qtdRealizada: a.qtdRealizada,
+            temQr: false
+          }))
+      }
+    })
 }
