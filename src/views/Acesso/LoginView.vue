@@ -18,7 +18,7 @@ const errosCampo = ref({})
 const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const usuariosTeste = [
   { perfil: 'Chefe do FUSEx', cpf: '526.018.159-06' },
-  { perfil: 'Médico e Beneficiário', cpf: '083.016.613-05' },
+  { perfil: 'Médico', cpf: '083.016.613-05' },
   { perfil: 'Emissor', cpf: '186.091.390-34' },
   { perfil: 'Auditor', cpf: '996.030.824-30' },
   { perfil: 'OCS', cpf: '628.194.821-12' },
@@ -120,7 +120,10 @@ async function entrar() {
 
       <details v-if="USAR_MOCK" class="teste">
         <summary>Usuários de teste (modo mock)</summary>
-        <p class="fx-suave">Senha de todos: <span class="fx-mono">fusex123</span></p>
+        <p class="fx-suave">
+          Senha de todos: <span class="fx-mono">fusex123</span>. Militares da equipe também são beneficiários,
+          então escolhem o perfil depois de entrar.
+        </p>
         <ul>
           <li v-for="u in usuariosTeste" :key="u.cpf">
             <button type="button" class="link-teste" @click="cpf = u.cpf; senha = 'fusex123'">

@@ -1,14 +1,12 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { cadastrarBeneficiario } from '../../services/authService.js'
-import { cpfValido, emailValido, formatarCpf, somenteDigitos } from '../../utils/documentos.js'
+import { cpfValido, formatarCpf, somenteDigitos } from '../../utils/documentos.js'
 
 const form = reactive({
   precCp: '',
   dataNascimento: '',
   cpf: '',
-  email: '',
-  telefone: '',
   senha: '',
   confirmarSenha: ''
 })
@@ -23,8 +21,6 @@ function validar() {
   if (!form.precCp.trim()) erros.precCp = 'Informe o Prec-CP.'
   if (!form.dataNascimento) erros.dataNascimento = 'Informe a data de nascimento.'
   if (!cpfValido(form.cpf)) erros.cpf = 'CPF inválido.'
-  if (!emailValido(form.email)) erros.email = 'E-mail inválido.'
-  if (somenteDigitos(form.telefone).length < 10) erros.telefone = 'Informe o telefone com DDD.'
   if (form.senha.length < 8) erros.senha = 'A senha precisa ter pelo menos 8 caracteres.'
   if (form.confirmarSenha !== form.senha) erros.confirmarSenha = 'As senhas não conferem.'
   errosCampo.value = erros
@@ -41,8 +37,6 @@ async function enviar() {
       precCp: form.precCp.trim(),
       dataNascimento: form.dataNascimento,
       cpf: somenteDigitos(form.cpf),
-      email: form.email.trim(),
-      telefone: somenteDigitos(form.telefone),
       senha: form.senha
     })
   } catch (e) {
@@ -89,7 +83,7 @@ async function enviar() {
           </label>
         </div>
 
-        <h2 class="fx-secao-titulo">2. Contato e acesso</h2>
+        <h2 class="fx-secao-titulo">2. Seu acesso</h2>
         <div class="fx-grade">
           <label class="fx-campo">
             CPF (será o seu login)
@@ -103,17 +97,7 @@ async function enviar() {
             />
             <span v-if="errosCampo.cpf" class="fx-erro-campo">{{ errosCampo.cpf }}</span>
           </label>
-          <label class="fx-campo">
-            Telefone
-            <input v-model="form.telefone" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.telefone }" inputmode="tel" placeholder="(12) 99999-9999" />
-            <span v-if="errosCampo.telefone" class="fx-erro-campo">{{ errosCampo.telefone }}</span>
-          </label>
         </div>
-        <label class="fx-campo">
-          E-mail
-          <input v-model="form.email" type="email" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.email }" autocomplete="email" />
-          <span v-if="errosCampo.email" class="fx-erro-campo">{{ errosCampo.email }}</span>
-        </label>
         <div class="fx-grade">
           <label class="fx-campo">
             Senha
