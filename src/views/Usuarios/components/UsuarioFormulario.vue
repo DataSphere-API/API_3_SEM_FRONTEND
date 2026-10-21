@@ -1,48 +1,64 @@
 <script setup>
-import { reactive, ref, computed } from 'vue'
-import { salvarUsuario } from '../../../services/usuarioService.js'
-import { PERFIS, PERFIS_ATRIBUIVEIS } from '../../../utils/perfis.js'
-import { cpfValido, emailValido, formatarCpf, somenteDigitos } from '../../../utils/documentos.js'
+import { reactive, ref } from 'vue'
+import { criarUsuario } from '../../../services/usuarioService.js'
+import { buscarBeneficiarios } from '../../../services/beneficiarioService.js'
+import { PERFIS, PERFIS_DE_MILITAR } from '../../../utils/perfis.js'
+import { cpfValido, formatarCpf, somenteDigitos } from '../../../utils/documentos.js'
 
-const props = defineProps({
-  usuario: { type: Object, default: null },
+defineProps({
   ocs: { type: Array, required: true }
 })
 
 const emit = defineEmits(['fechar', 'salvo'])
 
-const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO']
-
-const editando = computed(() => Boolean(props.usuario))
-const ehBeneficiario = computed(() => props.usuario?.perfis.includes('BENEFICIARIO'))
-
 const form = reactive({
-  nome: props.usuario?.nome || '',
-  cpf: formatarCpf(props.usuario?.cpf || ''),
-  postoGraduacao: props.usuario?.postoGraduacao || '',
-  email: props.usuario?.email || '',
-  telefone: props.usuario?.telefone || '',
-  perfis: (props.usuario?.perfis || []).filter(p => PERFIS_ATRIBUIVEIS.includes(p)),
-  crm: props.usuario?.crm || '',
-  crmUf: props.usuario?.crmUf || '',
-  ocsCnpj: props.usuario?.ocsCnpj || '',
-  ativo: props.usuario?.ativo ?? true,
-  senhaProvisoria: ''
+  tipo: 'MILITAR',
+  cpf: '',
+  senha: '',
+  perfis: [],
+  crm: '',
+  ocsCnpj: '',
+  cargo: ''
 })
 
+const busca = ref('')
+const buscando = ref(false)
+const resultadosBusca = ref([])
+const militar = ref(null)
 const errosCampo = ref({})
 const erro = ref('')
 const salvando = ref(false)
 
+async function pesquisar() {
+  if (!busca.value.trim()) return
+  buscando.value = true
+  try {
+    resultadosBusca.value = await buscarBeneficiarios(busca.value)
+  } catch (e) {
+    erro.value = e.mensagemUsuario || 'Não foi possível buscar.'
+  } finally {
+    buscando.value = false
+  }
+}
+
+function escolher(b) {
+  militar.value = b
+  resultadosBusca.value = []
+  busca.value = ''
+}
+
 function validar() {
   const erros = {}
-  if (!form.nome.trim()) erros.nome = 'Informe o nome completo.'
   if (!cpfValido(form.cpf)) erros.cpf = 'CPF inválido.'
-  if (!emailValido(form.email)) erros.email = 'E-mail inválido.'
-  if (form.perfis.length === 0 && !ehBeneficiario.value) erros.perfis = 'Marque pelo menos um perfil.'
-  if (form.perfis.includes('MEDICO') && (!form.crm.trim() || !form.crmUf)) erros.crm = 'Médico precisa de CRM e UF.'
-  if (form.perfis.includes('OCS') && !form.ocsCnpj) erros.ocsCnpj = 'Escolha a OCS.'
-  if (!editando.value && form.senhaProvisoria.length < 8) erros.senhaProvisoria = 'Mínimo de 8 caracteres.'
+  if (form.senha.length < 8) erros.senha = 'Mínimo de 8 caracteres.'
+  if (form.tipo === 'MILITAR') {
+    if (!militar.value) erros.militar = 'Escolha a pessoa pelo nome ou Prec-CP.'
+    if (form.perfis.length === 0) erros.perfis = 'Marque pelo menos um perfil.'
+    if (form.perfis.includes('MEDICO') && !form.crm.trim()) erros.crm = 'Médico precisa de CRM.'
+  } else {
+    if (!form.ocsCnpj) erros.ocsCnpj = 'Escolha a OCS.'
+    if (!form.cargo.trim()) erros.cargo = 'Informe o cargo.'
+  }
   errosCampo.value = erros
   return Object.keys(erros).length === 0
 }
@@ -51,20 +67,17 @@ async function salvar() {
   erro.value = ''
   if (!validar()) return
 
+  const base = { tipo: form.tipo, cpf: somenteDigitos(form.cpf), senha: form.senha }
+  const dados =
+    form.tipo === 'MILITAR'
+      ? { ...base, precCp: militar.value.precCp, perfis: form.perfis, crm: form.crm.trim() }
+      : { ...base, ocsCnpj: form.ocsCnpj, cargo: form.cargo.trim() }
+
   salvando.value = true
   try {
-    const dados = {
-      ...form,
-      nome: form.nome.trim(),
-      cpf: somenteDigitos(form.cpf),
-      email: form.email.trim(),
-      telefone: somenteDigitos(form.telefone),
-      crm: form.crm.trim()
-    }
-    if (editando.value) delete dados.senhaProvisoria
-    emit('salvo', await salvarUsuario(dados, props.usuario?.id ?? null))
+    emit('salvo', await criarUsuario(dados))
   } catch (e) {
-    erro.value = e.mensagemUsuario || 'Não foi possível salvar o usuário.'
+    erro.value = e.mensagemUsuario || 'Não foi possível cadastrar o usuário.'
   } finally {
     salvando.value = false
   }
@@ -76,7 +89,7 @@ async function salvar() {
     <form class="fx-modal fx-modal-largo" novalidate @submit.prevent="salvar">
       <div class="fx-modal-topo">
         <div>
-          <h2>{{ editando ? 'Editar usuário' : 'Novo usuário' }}</h2>
+          <h2>Novo usuário</h2>
           <p>Com mais de um perfil, a pessoa escolhe com qual entrar depois do login.</p>
         </div>
         <button type="button" class="fx-fechar" aria-label="Fechar" @click="emit('fechar')">&times;</button>
@@ -85,12 +98,84 @@ async function salvar() {
       <div class="fx-modal-corpo">
         <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
 
-        <h3 class="fx-secao-titulo">1. Dados pessoais</h3>
-        <label class="fx-campo">
-          Nome completo
-          <input v-model="form.nome" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.nome }" />
-          <span v-if="errosCampo.nome" class="fx-erro-campo">{{ errosCampo.nome }}</span>
-        </label>
+        <div class="fx-checks" role="radiogroup" aria-label="Tipo de usuário">
+          <label class="fx-check">
+            <input v-model="form.tipo" type="radio" value="MILITAR" />
+            Militar do FUSEx
+          </label>
+          <label class="fx-check">
+            <input v-model="form.tipo" type="radio" value="OCS" />
+            Funcionário de OCS
+          </label>
+        </div>
+
+        <template v-if="form.tipo === 'MILITAR'">
+          <h3 class="fx-secao-titulo">1. Quem é</h3>
+          <div v-if="militar" class="escolhido">
+            <span><strong>{{ militar.nome }}</strong> <span class="fx-suave fx-mono">· Prec-CP {{ militar.precCp }}</span></span>
+            <button type="button" class="fx-botao-secundario" @click="militar = null">Trocar</button>
+          </div>
+          <template v-else>
+            <div class="busca">
+              <label class="fx-campo">
+                Buscar pelo nome ou Prec-CP
+                <input
+                  v-model="busca"
+                  class="fx-entrada"
+                  :class="{ 'fx-entrada-erro': errosCampo.militar }"
+                  @keydown.enter.prevent="pesquisar"
+                />
+              </label>
+              <button type="button" class="fx-botao-secundario" :disabled="buscando" @click="pesquisar">Buscar</button>
+            </div>
+            <span v-if="errosCampo.militar" class="fx-erro-campo">{{ errosCampo.militar }}</span>
+            <ul v-if="resultadosBusca.length" class="fx-lista resultados">
+              <li v-for="b in resultadosBusca" :key="b.precCp">
+                <button type="button" class="resultado" @click="escolher(b)">
+                  <strong>{{ b.nome }}</strong>
+                  <span class="fx-suave fx-mono">Prec-CP {{ b.precCp }}</span>
+                </button>
+              </li>
+            </ul>
+            <p class="fx-suave">O nome vem do cadastro de beneficiários do FUSEx.</p>
+          </template>
+
+          <h3 class="fx-secao-titulo">2. Perfis</h3>
+          <div class="fx-checks">
+            <label v-for="perfil in PERFIS_DE_MILITAR" :key="perfil" class="fx-check">
+              <input v-model="form.perfis" type="checkbox" :value="perfil" />
+              {{ PERFIS[perfil].rotulo }}
+            </label>
+          </div>
+          <span v-if="errosCampo.perfis" class="fx-erro-campo">{{ errosCampo.perfis }}</span>
+          <label v-if="form.perfis.includes('MEDICO')" class="fx-campo">
+            CRM
+            <input v-model="form.crm" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.crm }" inputmode="numeric" />
+            <span v-if="errosCampo.crm" class="fx-erro-campo">{{ errosCampo.crm }}</span>
+          </label>
+          <p class="fx-suave">Se a pessoa já tem acesso (por exemplo, como beneficiária), os perfis são acrescentados ao login dela.</p>
+        </template>
+
+        <template v-else>
+          <h3 class="fx-secao-titulo">1. Onde trabalha</h3>
+          <div class="fx-grade">
+            <label class="fx-campo">
+              OCS
+              <select v-model="form.ocsCnpj" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.ocsCnpj }">
+                <option value="" disabled>Escolha a OCS</option>
+                <option v-for="o in ocs" :key="o.cnpj" :value="o.cnpj">{{ o.nome }}</option>
+              </select>
+              <span v-if="errosCampo.ocsCnpj" class="fx-erro-campo">{{ errosCampo.ocsCnpj }}</span>
+            </label>
+            <label class="fx-campo">
+              Cargo
+              <input v-model="form.cargo" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.cargo }" placeholder="Ex.: Recepção" />
+              <span v-if="errosCampo.cargo" class="fx-erro-campo">{{ errosCampo.cargo }}</span>
+            </label>
+          </div>
+        </template>
+
+        <h3 class="fx-secao-titulo">{{ form.tipo === 'MILITAR' ? '3' : '2' }}. Acesso</h3>
         <div class="fx-grade">
           <label class="fx-campo">
             CPF (login)
@@ -104,78 +189,17 @@ async function salvar() {
             <span v-if="errosCampo.cpf" class="fx-erro-campo">{{ errosCampo.cpf }}</span>
           </label>
           <label class="fx-campo">
-            Posto / graduação
-            <input v-model="form.postoGraduacao" class="fx-entrada" placeholder="Opcional" />
+            Senha provisória
+            <input v-model="form.senha" type="text" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.senha }" autocomplete="off" />
+            <span v-if="errosCampo.senha" class="fx-erro-campo">{{ errosCampo.senha }}</span>
           </label>
         </div>
-        <div class="fx-grade">
-          <label class="fx-campo">
-            E-mail
-            <input v-model="form.email" type="email" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.email }" />
-            <span v-if="errosCampo.email" class="fx-erro-campo">{{ errosCampo.email }}</span>
-          </label>
-          <label class="fx-campo">
-            Telefone
-            <input v-model="form.telefone" class="fx-entrada" inputmode="tel" />
-          </label>
-        </div>
-
-        <h3 class="fx-secao-titulo">2. Perfis de acesso</h3>
-        <div class="fx-checks">
-          <label v-for="perfil in PERFIS_ATRIBUIVEIS" :key="perfil" class="fx-check">
-            <input v-model="form.perfis" type="checkbox" :value="perfil" />
-            {{ PERFIS[perfil].rotulo }}
-          </label>
-        </div>
-        <span v-if="errosCampo.perfis" class="fx-erro-campo">{{ errosCampo.perfis }}</span>
-        <p v-if="ehBeneficiario" class="fx-alerta fx-alerta-cinza">
-          Também é beneficiário (Prec-CP <span class="fx-mono">{{ usuario.precCp }}</span>). Esse perfil vem do
-          autocadastro e não é alterado aqui.
-        </p>
-
-        <template v-if="form.perfis.includes('MEDICO') || form.perfis.includes('OCS')">
-          <h3 class="fx-secao-titulo">3. Dados por perfil</h3>
-          <div v-if="form.perfis.includes('MEDICO')" class="fx-grade">
-            <label class="fx-campo">
-              CRM (Médico)
-              <input v-model="form.crm" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.crm }" inputmode="numeric" />
-              <span v-if="errosCampo.crm" class="fx-erro-campo">{{ errosCampo.crm }}</span>
-            </label>
-            <label class="fx-campo campo-uf">
-              UF do CRM
-              <select v-model="form.crmUf" class="fx-entrada">
-                <option value="" disabled>UF</option>
-                <option v-for="uf in UFS" :key="uf" :value="uf">{{ uf }}</option>
-              </select>
-            </label>
-          </div>
-          <label v-if="form.perfis.includes('OCS')" class="fx-campo">
-            OCS onde trabalha
-            <select v-model="form.ocsCnpj" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.ocsCnpj }">
-              <option value="" disabled>Escolha a OCS</option>
-              <option v-for="o in ocs" :key="o.cnpj" :value="o.cnpj">{{ o.nomeFantasia }}</option>
-            </select>
-            <span v-if="errosCampo.ocsCnpj" class="fx-erro-campo">{{ errosCampo.ocsCnpj }}</span>
-          </label>
-        </template>
-
-        <label v-if="!editando" class="fx-campo">
-          Senha provisória
-          <input v-model="form.senhaProvisoria" type="text" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.senhaProvisoria }" autocomplete="off" />
-          <span v-if="errosCampo.senhaProvisoria" class="fx-erro-campo">{{ errosCampo.senhaProvisoria }}</span>
-          <span class="fx-suave">Passe essa senha para a pessoa entrar pela primeira vez.</span>
-        </label>
-
-        <label class="fx-check ativo">
-          <input v-model="form.ativo" type="checkbox" />
-          Usuário ativo
-        </label>
       </div>
 
       <div class="fx-modal-rodape">
         <button type="button" class="fx-botao-secundario" @click="emit('fechar')">Cancelar</button>
         <button type="submit" class="fx-botao" :disabled="salvando">
-          {{ salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Cadastrar usuário' }}
+          {{ salvando ? 'Salvando...' : 'Cadastrar usuário' }}
         </button>
       </div>
     </form>
@@ -183,12 +207,34 @@ async function salvar() {
 </template>
 
 <style scoped>
-.campo-uf {
-  flex: 0 1 120px;
-  min-width: 100px;
+.escolhido,
+.busca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
-.ativo {
-  align-self: flex-start;
+.escolhido {
+  align-items: center;
+}
+
+.resultados {
+  gap: 0.4rem;
+}
+
+.resultado {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 1px solid var(--fx-borda);
+  border-radius: 8px;
+  background-color: #ffffff;
+  font-family: inherit;
+  cursor: pointer;
 }
 </style>
