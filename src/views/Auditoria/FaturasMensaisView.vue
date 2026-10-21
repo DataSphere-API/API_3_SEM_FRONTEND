@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { listarFaturasMensais, buscarFaturaMensal, encaminharFaturaMensal } from '../../services/faturaMensalService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData, formatarDataHora } from '../../utils/documentos.js'
-import { mesEncerrado, rotuloCompetencia } from '../../utils/competencia.js'
+import { fimDoPrazoDeEnvio, prazoDeEnvioEncerrado, rotuloCompetencia } from '../../utils/competencia.js'
 import { avaliarCobranca, pontuacaoDoEspelho, classeDaPontuacao } from '../../utils/pontuacao.js'
 
 const faturas = ref([])
@@ -31,7 +31,7 @@ const itensDaAberta = computed(() =>
 
 function situacao(fatura) {
   if (fatura.status === 'ENCAMINHADA_APROVACAO') return { texto: 'Encaminhada', classe: 'fx-selo-azul' }
-  if (!mesEncerrado(fatura.competencia)) return { texto: 'Mês em andamento', classe: 'fx-selo-cinza' }
+  if (!prazoDeEnvioEncerrado(fatura.competencia)) return { texto: 'Recebendo espelhos', classe: 'fx-selo-cinza' }
   if (fatura.espelhosPendentes) return { texto: 'Aguardando espelhos', classe: 'fx-selo-ambar' }
   return { texto: 'Pronta para encaminhar', classe: 'fx-selo-verde' }
 }
@@ -39,7 +39,9 @@ function situacao(fatura) {
 // Motivo de não poder encaminhar ainda (ou null quando pode).
 function bloqueio(fatura) {
   if (fatura.status !== 'ATIVA') return null
-  if (!mesEncerrado(fatura.competencia)) return `A fatura de ${rotuloCompetencia(fatura.competencia)} só pode ser encaminhada depois que o mês acabar.`
+  if (!prazoDeEnvioEncerrado(fatura.competencia)) {
+    return `A OCS pode mandar espelhos de ${rotuloCompetencia(fatura.competencia)} até ${formatarData(fimDoPrazoDeEnvio(fatura.competencia))}. A fatura pode ser encaminhada depois disso.`
+  }
   if (fatura.espelhosPendentes) return `Ainda há ${fatura.espelhosPendentes} espelho(s) deste mês na auditoria ou em correção pela OCS.`
   return null
 }

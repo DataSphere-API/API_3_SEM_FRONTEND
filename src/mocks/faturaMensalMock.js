@@ -4,7 +4,7 @@
 // dos espelhos (todos do mesmo mês), sem coluna nova.
 import { banco, persistir, proximoId, copiar, registrarHistorico, valorContratadoDoAtendimento } from './bancoMock.js'
 import { erroHttp, esperar } from './auxiliares.js'
-import { competenciaDe, mesEncerrado } from '../utils/competencia.js'
+import { competenciaDe, prazoDeEnvioEncerrado } from '../utils/competencia.js'
 
 const PENDENTES = ['EM_ABERTO', 'REPROVADO']
 
@@ -127,15 +127,15 @@ export async function mockBuscarFatura(id) {
   })
 }
 
-// POST /faturas/{id}/encaminhar (US002-3): só depois que o mês acabou e sem espelho pendente.
+// POST /faturas/{id}/encaminhar (US002-3): só depois do prazo de envio dos espelhos e sem espelho pendente.
 export async function mockEncaminharFatura(id) {
   await esperar(400)
   const fatura = encontrar(id)
   if (fatura.status !== 'ATIVA') {
     throw erroHttp(409, { codigo: 'FATURA_NAO_ENCAMINHAVEL', mensagem: 'Esta fatura já foi encaminhada.' })
   }
-  if (!mesEncerrado(fatura.competencia)) {
-    throw erroHttp(422, { codigo: 'MES_NAO_ENCERRADO', mensagem: 'A fatura só pode ser encaminhada depois que o mês acabar.' })
+  if (!prazoDeEnvioEncerrado(fatura.competencia)) {
+    throw erroHttp(422, { codigo: 'MES_NAO_ENCERRADO', mensagem: 'Ainda podem chegar espelhos deste mês (até o dia 5 do mês seguinte).' })
   }
   if (espelhosPendentes(fatura).length) {
     throw erroHttp(422, { codigo: 'AUDITORIA_PENDENTE', mensagem: 'Ainda há espelhos deste mês na auditoria ou em correção pela OCS.' })

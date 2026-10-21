@@ -5,7 +5,7 @@ import { banco, persistir, proximoId, copiar, registrarHistorico, valorContratad
 import { erroHttp, esperar } from './auxiliares.js'
 import { atendimentos } from './checkMutuoMock.js'
 import { incluirEspelhoNaFatura } from './faturaMensalMock.js'
-import { competenciaAtual, competenciaDe } from '../utils/competencia.js'
+import { competenciaDe, competenciasAbertasParaEspelho, rotuloCompetencia } from '../utils/competencia.js'
 
 function resumo(espelho) {
   const db = banco()
@@ -67,9 +67,13 @@ export async function mockCriarEspelho({ ocsId, dataInicio, dataFim, itens }) {
   if (!dataInicio || !dataFim || dataFim < dataInicio) {
     throw erroHttp(400, { codigo: 'PERIODO_INVALIDO', mensagem: 'Informe um período válido.' })
   }
-  // O espelho é do mês em que é enviado: entra na fatura desse mês.
-  if (competenciaDe(dataInicio) !== competenciaAtual() || competenciaDe(dataFim) !== competenciaAtual()) {
-    throw erroHttp(422, { codigo: 'FORA_DO_MES', mensagem: 'O espelho só pode ter atendimentos do mês atual.' })
+  // O espelho é de um mês só e entra na fatura desse mês. Vale o mês atual e, até o dia 5, o anterior.
+  const abertas = competenciasAbertasParaEspelho()
+  if (competenciaDe(dataInicio) !== competenciaDe(dataFim) || !abertas.includes(competenciaDe(dataInicio))) {
+    throw erroHttp(422, {
+      codigo: 'FORA_DO_MES',
+      mensagem: `O espelho precisa ser de um mês só: ${abertas.map(rotuloCompetencia).join(' ou ')}.`
+    })
   }
   if (!itens?.length) {
     throw erroHttp(400, { codigo: 'ITENS_OBRIGATORIOS', mensagem: 'Escolha pelo menos um atendimento.' })
