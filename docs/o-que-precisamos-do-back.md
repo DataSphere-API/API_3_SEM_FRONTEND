@@ -12,9 +12,10 @@ Erros sempre no formato da US000-12: `{ "codigo": "...", "mensagem": "..." }`. A
 
 ## Resumo para o time
 
-- **Banco:** só **2 colunas novas** — `Sessao_Procedimento.Data_Confirmacao` e `Espelho.Motivo_Reprovacao`.
+- **Banco:** **2 colunas novas** (`Sessao_Procedimento.Data_Confirmacao` e `Espelho.Motivo_Reprovacao`) e **soltar a
+  trava de 1 atendimento por espelho** (`Espelho.Atendimento_ID`), porque o espelho junta vários atendimentos.
 - **Ajustar issues existentes:** #41 (contrato do login), #75 e #76 (campos a mais no DTO),
-  **#77 (aprovação dupla: médico + chefe)**, #72 e #92 (check mútuo).
+  **#77 (aprovação dupla: médico + chefe)**, #72 e #92 (check mútuo), **US001-4 (espelho com vários atendimentos)**.
 - **Criar issues novas:** autocadastro, usuários, OCS, procedimentos (listar e cadastrar), contratos, médicos, busca de
   beneficiários, criar/editar pré-guia, confirmar/recusar sessão, aprovar/reprovar espelho.
 
@@ -34,7 +35,7 @@ exatamente os contratos abaixo e servem de referência para o back.
 
 Militares da equipe também são beneficiários (ver item 1), então escolhem o perfil depois de entrar.
 Autocadastro: Prec-CP `123456` + nascimento `21/07/1990`. Para zerar os dados, apague a chave
-`fusex-banco-mock-v3` do Local Storage. Para testar o check mútuo, abra a OCS e o beneficiário em duas
+`fusex-banco-mock-v4` do Local Storage. Para testar o check mútuo, abra a OCS e o beneficiário em duas
 abas do mesmo navegador (cada aba tem o seu login).
 
 ---
@@ -131,25 +132,43 @@ ALTER TABLE Sessao_Procedimento ADD COLUMN Data_Confirmacao TIMESTAMP; -- nula =
 A baixa por QR (US004-3) deixa de ser necessária para o fluxo. O "Minhas guias" do beneficiário usa o
 `GET /beneficiarios/{precCp}/guias` (#64) com o Prec-CP do login.
 
-## 6. Auditor
+## 6. Espelho: vários atendimentos de um período (OCS)
+
+O espelho é a junção dos atendimentos realizados pela OCS no mês (ou no período que ela escolher).
+Cada item é um atendimento, com o valor que a OCS cobra. A tabela `Espelho_Item` já tem `Atendimento_ID`.
 
 | | O quê | Issue |
 |---|---|---|
-| ✅ | `GET /espelhos` (receber), `GET /espelhos/{id}/itens` | US001-5 |
+| 🔧 | `GET /ocs/{cnpj}/atendimentos` — acrescentar `dataRealizacao` (data da última sessão confirmada) e `espelhoId` (espelho não reprovado em que o atendimento já está, ou `null`) | #92 |
+| 🔧 | `POST /espelhos` passa a receber `{ ocsId, dataInicio, dataFim, itens: [{ atendimentoId, valor }] }`. O back preenche `beneficiarioId` e `descricao` (nome do procedimento) pelo atendimento. Regras: atendimento da OCS e `REALIZADA` (422 `ATENDIMENTO_NAO_REALIZADO`), realizado dentro do período (422 `FORA_DO_PERIODO`), fora de outro espelho não reprovado (409 `ATENDIMENTO_JA_EM_ESPELHO`), valor > 0 (400 `VALOR_INVALIDO`) | US001-4 |
+| ✅ | `GET /espelhos?cnpj=` — a OCS só vê os dela | US001-5 |
+
+```sql
+-- O espelho deixa de ser de um atendimento só: o vínculo fica em Espelho_Item.Atendimento_ID.
+ALTER TABLE Espelho DROP CONSTRAINT uq_espelho_atendimento;
+ALTER TABLE Espelho ALTER COLUMN Atendimento_ID DROP NOT NULL;
+```
+Espelho reprovado libera os atendimentos para a OCS mandar de novo num espelho corrigido.
+
+## 7. Auditor
+
+| | O quê | Issue |
+|---|---|---|
+| ✅ | `GET /espelhos` (receber) | US001-5 |
+| 🔧 | `GET /espelhos/{id}/itens` — voltar a mandar `atendimentoId` (a US000-14 tirou) e acrescentar `valorContratado` (contrato do procedimento com a OCS; o back já tem `obterValorContratado`, US001-2). `null` quando não há contrato | US000-14 |
 | 🔧 | Acrescentar `motivoReprovacao` no `EspelhoResumoResponse` | US000-14 |
 | 🆕 | `PATCH /espelhos/{id}/aprovar` e `PATCH /espelhos/{id}/reprovar` com `{ motivo }` → status `APROVADO` / `REPROVADO`, grava o histórico. Erros: 409 `ESPELHO_JA_AUDITADO`, 400 `MOTIVO_OBRIGATORIO` | — |
 | ✅ | `GET /guias/{id}/historico` (o `id` é do Guia_Proc = atendimento) e `GET /espelhos/{id}/historico` | US001-3 |
+
+**Pontuação (calculada no front, não precisa de back):** para cada atendimento, 100 quando o valor
+cobrado está dentro do contrato; cai 1 ponto por ponto percentual acima; sem contrato vale 0. A faixa
+usa os limites da US002-2 (baixa até 5%, média até 15%, alta acima). A pontuação do espelho é a média
+dos atendimentos.
 
 ```sql
 ALTER TABLE Espelho ADD COLUMN Motivo_Reprovacao VARCHAR(255);
 ```
 Os status `APROVADO` e `REPROVADO` entram só no enum `StatusEspelho` (a coluna `Status VARCHAR(20)` já comporta).
-
-## 7. OCS — enviar espelho
-
-| | O quê |
-|---|---|
-| ✅ | `POST /espelhos` e `GET /espelhos?cnpj=` (US001-4/5). O front manda o CNPJ do login e só lista os espelhos da OCS logada. O espelho só deve ser aceito para atendimento `REALIZADA` (já é a regra da US001-4) |
 
 ## Ainda no front, fora deste pacote
 
