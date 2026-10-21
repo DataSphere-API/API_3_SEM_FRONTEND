@@ -13,7 +13,7 @@ const STATUS = {
   FATURADA: 'Faturado',
   EM_ABERTO: 'Recebido para auditoria',
   APROVADO: 'Aprovado',
-  REPROVADO: 'Reprovado',
+  REPROVADO: 'Reprovado e devolvido à OCS',
   FATURADO: 'Faturado',
   CANCELADO: 'Cancelado'
 }
@@ -22,6 +22,7 @@ const ORIGEM = {
   'emissao-da-guia': 'Guia emitida pelo FUSEx',
   'confirmacao-do-beneficiario': 'Confirmado pelo beneficiário',
   'envio-pela-ocs': 'Enviado pela OCS',
+  'reenvio-pela-ocs': 'Corrigido e reenviado pela OCS',
   auditoria: 'Auditoria'
 }
 

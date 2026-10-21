@@ -8,7 +8,7 @@ import { avaliarCobranca, pontuacaoDoEspelho, classeDaPontuacao } from '../../ut
 const STATUS = {
   EM_ABERTO: { texto: 'A auditar', classe: 'fx-selo-ambar' },
   APROVADO: { texto: 'Aprovado', classe: 'fx-selo-verde' },
-  REPROVADO: { texto: 'Reprovado', classe: 'fx-selo-vermelho' },
+  REPROVADO: { texto: 'Devolvido à OCS', classe: 'fx-selo-vermelho' },
   FATURADO: { texto: 'Faturado', classe: 'fx-selo-azul' },
   CANCELADO: { texto: 'Cancelado', classe: 'fx-selo-cinza' }
 }
@@ -16,7 +16,7 @@ const STATUS = {
 const FILTROS = [
   { valor: 'EM_ABERTO', rotulo: 'A auditar' },
   { valor: 'APROVADO', rotulo: 'Aprovados' },
-  { valor: 'REPROVADO', rotulo: 'Reprovados' },
+  { valor: 'REPROVADO', rotulo: 'Devolvidos à OCS' },
   { valor: '', rotulo: 'Todos' }
 ]
 
@@ -93,7 +93,7 @@ async function reprovar() {
   decidindo.value = true
   try {
     await reprovarEspelho(selecionado.value.id, motivo.value)
-    aviso.value = `Espelho #${selecionado.value.id} reprovado. A OCS vê o motivo.`
+    aviso.value = `Espelho #${selecionado.value.id} reprovado e devolvido à OCS para correção.`
     selecionado.value = null
     await carregar()
   } catch (e) {
@@ -153,7 +153,10 @@ onMounted(carregar)
                 <td>{{ formatarData(e.dataInicio) }} a {{ formatarData(e.dataFim) }}</td>
                 <td>{{ e.quantidadeItens }}</td>
                 <td class="fx-mono">{{ formatarMoeda(e.valorTotal) }}</td>
-                <td><span class="fx-selo" :class="selo(e.status).classe">{{ selo(e.status).texto }}</span></td>
+                <td>
+                  <span class="fx-selo" :class="selo(e.status).classe">{{ selo(e.status).texto }}</span>
+                  <span v-if="e.status === 'EM_ABERTO' && e.devolucoes" class="fx-selo fx-selo-azul reenvio">Reenviado após devolução</span>
+                </td>
                 <td>
                   <button type="button" class="fx-botao-secundario" @click="abrir(e)">
                     {{ e.status === 'EM_ABERTO' ? 'Auditar' : 'Ver' }}
@@ -184,7 +187,11 @@ onMounted(carregar)
             <div><dt>Atendimentos</dt><dd>{{ itens.length }}</dd></div>
             <div v-if="selecionado.dataAtualizacao"><dt>Auditado em</dt><dd>{{ formatarDataHora(selecionado.dataAtualizacao) }}</dd></div>
           </dl>
-          <p v-if="selecionado.motivoReprovacao" class="fx-alerta fx-alerta-vermelho">
+          <p v-if="selecionado.status === 'EM_ABERTO' && selecionado.devolucoes" class="fx-alerta fx-alerta-azul">
+            <strong>Reenviado pela OCS após devolução</strong>
+            ({{ selecionado.devolucoes }}ª correção). Motivo da última reprovação: “{{ selecionado.motivoReprovacao }}”
+          </p>
+          <p v-else-if="selecionado.motivoReprovacao" class="fx-alerta fx-alerta-vermelho">
             <strong>Motivo da reprovação:</strong> {{ selecionado.motivoReprovacao }}
           </p>
 
@@ -326,6 +333,16 @@ onMounted(carregar)
 
 .dados dd {
   margin: 0.2rem 0 0;
+}
+
+.reenvio {
+  margin-left: 0.3rem;
+}
+
+.fx-alerta-azul {
+  background-color: #e3ecf8;
+  border-color: #bcd0ec;
+  color: #1e4a8a;
 }
 
 .link {
