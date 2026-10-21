@@ -4,6 +4,7 @@ import { listarEspelhos, listarItensEspelho, aprovarEspelho, reprovarEspelho } f
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData, formatarDataHora } from '../../utils/documentos.js'
 import { avaliarCobranca, pontuacaoDoEspelho, classeDaPontuacao } from '../../utils/pontuacao.js'
+import { rotuloCompetencia } from '../../utils/competencia.js'
 
 const STATUS = {
   EM_ABERTO: { texto: 'A auditar', classe: 'fx-selo-ambar' },
@@ -73,8 +74,8 @@ async function aprovar() {
   erroDecisao.value = ''
   decidindo.value = true
   try {
-    await aprovarEspelho(selecionado.value.id)
-    aviso.value = `Espelho #${selecionado.value.id} aprovado.`
+    const resposta = await aprovarEspelho(selecionado.value.id)
+    aviso.value = `Espelho #${selecionado.value.id} aprovado e incluído na fatura de ${rotuloCompetencia(resposta.competencia)} da ${selecionado.value.ocsNome}.`
     selecionado.value = null
     await carregar()
   } catch (e) {

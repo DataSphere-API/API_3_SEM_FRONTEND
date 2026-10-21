@@ -15,7 +15,9 @@ const STATUS = {
   APROVADO: 'Aprovado',
   REPROVADO: 'Reprovado e devolvido à OCS',
   FATURADO: 'Faturado',
-  CANCELADO: 'Cancelado'
+  CANCELADO: 'Cancelado',
+  ATIVA: 'Fatura aberta',
+  ENCAMINHADA_APROVACAO: 'Encaminhada para aprovação'
 }
 
 const ORIGEM = {
@@ -23,7 +25,9 @@ const ORIGEM = {
   'confirmacao-do-beneficiario': 'Confirmado pelo beneficiário',
   'envio-pela-ocs': 'Enviado pela OCS',
   'reenvio-pela-ocs': 'Corrigido e reenviado pela OCS',
-  auditoria: 'Auditoria'
+  auditoria: 'Auditoria',
+  'aprovacao-do-espelho': 'Aberta com o primeiro espelho aprovado do mês',
+  'encaminhamento-para-aprovacao': 'Encaminhada para aprovação'
 }
 
 function rotulo(status) {

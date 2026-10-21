@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import EspelhosViews from '../views/Espelhos/EspelhosViews.vue'
 import CriarEspelhoView from '../views/Espelhos/CriarEspelhoView.vue'
 import CorrigirEspelhoView from '../views/Espelhos/CorrigirEspelhoView.vue'
-import FaturasViews from '../views/Faturas/FaturasViews.vue'
 import MinhasGuiasView from '../views/Guias/MinhasGuiasView.vue'
 import AtendimentoView from '../views/Atendimentos/AtendimentoView.vue'
 import PreGuiasView from '../views/PreGuias/PreGuiasView.vue'
@@ -20,6 +19,7 @@ import AtendimentosOcsView from '../views/Atendimentos/AtendimentosOcsView.vue'
 import ConfirmarAtendimentoView from '../views/Guias/ConfirmarAtendimentoView.vue'
 import EspelhosRecebidosView from '../views/Auditoria/EspelhosRecebidosView.vue'
 import HistoricoView from '../views/Auditoria/HistoricoView.vue'
+import FaturasMensaisView from '../views/Auditoria/FaturasMensaisView.vue'
 import { sessao } from '../stores/sessao.js'
 import { PERFIS } from '../utils/perfis.js'
 
@@ -38,7 +38,8 @@ const routes = [
   { path: '/espelhos', name: 'espelhos', component: EspelhosViews, meta: { perfis: ['OCS'] } },
   { path: '/espelhos/novo', name: 'espelhos-novo', component: CriarEspelhoView, meta: { perfis: ['OCS'] } },
   { path: '/espelhos/:id/corrigir', name: 'corrigir-espelho', component: CorrigirEspelhoView, meta: { perfis: ['OCS'] } },
-  { path: '/faturas', name: 'faturas', component: FaturasViews, meta: { perfis: ['AUDITOR'] } },
+  // Fatura mensal por OCS (substitui a tela antiga de gerar/regerar fatura por espelho).
+  { path: '/faturas', name: 'faturas', component: FaturasMensaisView, meta: { perfis: ['AUDITOR'] } },
   { path: '/minhas-guias', name: 'minhas-guias', component: MinhasGuiasView, meta: { perfis: ['BENEFICIARIO'] } },
   { path: '/atendimento', name: 'atendimento', component: AtendimentoView, meta: { perfis: ['OCS'] } },
   { path: '/pre-guias', name: 'pre-guias', component: PreGuiasView, meta: { perfis: ['CHEFE'] } },
