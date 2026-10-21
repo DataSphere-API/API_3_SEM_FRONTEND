@@ -1,6 +1,6 @@
 // Banco em memória dos mocks, no formato das tabelas e issues do back.
 // Fica salvo no localStorage para o fluxo continuar entre abas e logins de perfis diferentes.
-const CHAVE = 'fusex-banco-mock-v3'
+const CHAVE = 'fusex-banco-mock-v4'
 const SENHA_PADRAO = 'fusex123'
 
 const IMAGEM_CENTRO = '12345678000199'
@@ -117,7 +117,10 @@ function semente() {
       preGuia(7, {
         status: 'EMITIDA',
         beneficiarioPrecCp: '1001',
-        procedimentos: [{ atendimentoId: 601, procedimentoId: 3, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }],
+        procedimentos: [
+          { atendimentoId: 601, procedimentoId: 3, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 },
+          { atendimentoId: 602, procedimentoId: 5, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }
+        ],
         dataAprovacaoMedico: '2026-10-08T09:00:00',
         dataAprovacaoChefe: '2026-10-08T10:00:00',
         chefeId: 1,
@@ -133,14 +136,16 @@ function semente() {
     // Sessao_Procedimento + Data_Confirmacao (check mútuo). Nula = aguardando o beneficiário.
     sessoes: [
       { id: 1, atendimentoId: 501, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-17T10:00:00', dataConfirmacao: '2026-10-17T10:04:00' },
-      { id: 2, atendimentoId: 601, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-11T08:30:00', dataConfirmacao: '2026-10-11T08:41:00' }
+      { id: 2, atendimentoId: 601, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-11T08:30:00', dataConfirmacao: '2026-10-11T08:41:00' },
+      { id: 3, atendimentoId: 602, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-12T15:10:00', dataConfirmacao: '2026-10-12T15:20:00' }
     ],
+    // Espelho = todos os atendimentos realizados de uma OCS num período; cada item é um atendimento.
     espelhos: [
-      { id: 1, atendimentoId: 601, ocsId: IMAGEM_CENTRO, dataInicio: '2026-10-11', dataFim: '2026-10-11', status: 'EM_ABERTO', dataAtualizacao: null, motivoReprovacao: null }
+      { id: 1, ocsId: IMAGEM_CENTRO, dataInicio: '2026-10-01', dataFim: '2026-10-15', status: 'EM_ABERTO', dataAtualizacao: null, motivoReprovacao: null }
     ],
     espelhoItens: [
-      { id: 1, espelhoId: 1, beneficiarioId: '1001', descricao: 'Ultrassom · abdome total', valor: 280.0 },
-      { id: 2, espelhoId: 1, beneficiarioId: '1001', descricao: 'Gel condutor e materiais', valor: 15.0 }
+      { id: 1, espelhoId: 1, atendimentoId: 601, beneficiarioId: '1001', descricao: 'Ultrassom · abdome total', valor: 310.0 },
+      { id: 2, espelhoId: 1, atendimentoId: 602, beneficiarioId: '1001', descricao: 'Raio-X · joelho', valor: 90.0 }
     ],
     // historico_status (US001-3): GUIA_PROC usa o atendimentoId.
     historico: [
@@ -149,7 +154,9 @@ function semente() {
       { id: 3, entidadeTipo: 'GUIA_PROC', entidadeId: 501, statusAnterior: 'PENDENTE', statusNovo: 'EM_ANDAMENTO', data: '2026-10-17T10:04:00', origem: 'confirmacao-do-beneficiario' },
       { id: 4, entidadeTipo: 'GUIA_PROC', entidadeId: 601, statusAnterior: null, statusNovo: 'PENDENTE', data: '2026-10-09T09:00:00', origem: 'emissao-da-guia' },
       { id: 5, entidadeTipo: 'GUIA_PROC', entidadeId: 601, statusAnterior: 'PENDENTE', statusNovo: 'REALIZADA', data: '2026-10-11T08:41:00', origem: 'confirmacao-do-beneficiario' },
-      { id: 6, entidadeTipo: 'ESPELHO', entidadeId: 1, statusAnterior: null, statusNovo: 'EM_ABERTO', data: '2026-10-12T14:00:00', origem: 'envio-pela-ocs' }
+      { id: 6, entidadeTipo: 'GUIA_PROC', entidadeId: 602, statusAnterior: null, statusNovo: 'PENDENTE', data: '2026-10-09T09:00:00', origem: 'emissao-da-guia' },
+      { id: 7, entidadeTipo: 'GUIA_PROC', entidadeId: 602, statusAnterior: 'PENDENTE', statusNovo: 'REALIZADA', data: '2026-10-12T15:20:00', origem: 'confirmacao-do-beneficiario' },
+      { id: 8, entidadeTipo: 'ESPELHO', entidadeId: 1, statusAnterior: null, statusNovo: 'EM_ABERTO', data: '2026-10-16T14:00:00', origem: 'envio-pela-ocs' }
     ]
   }
 }

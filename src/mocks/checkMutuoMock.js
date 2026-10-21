@@ -7,6 +7,15 @@ function hoje() {
   return new Date().toISOString().slice(0, 10)
 }
 
+// Espelho em que o atendimento já foi cobrado. Espelho reprovado libera o atendimento para reenvio.
+function espelhoAtivoDo(atendimentoId) {
+  const db = banco()
+  const item = db.espelhoItens.find(
+    i => i.atendimentoId === atendimentoId && db.espelhos.find(e => e.id === i.espelhoId)?.status !== 'REPROVADO'
+  )
+  return item ? item.espelhoId : null
+}
+
 // Monta a visão de cada procedimento de guia emitida, como o GET /ocs/{cnpj}/atendimentos devolveria.
 export function atendimentos() {
   const db = banco()
@@ -28,11 +37,14 @@ export function atendimentos() {
           guiaNumero: numeroPreGuia(guia.id),
           beneficiario: { precCp: guia.beneficiarioPrecCp, nome: beneficiario?.nome || '—' },
           procedimento: db.procedimentos.find(x => x.id === p.procedimentoId)?.nome || '—',
-          ocs: { cnpj: p.ocsCnpj, nome: ocs?.nomeFantasia || '—' },
+          ocs: { cnpj: p.ocsCnpj, nome: ocs?.nome || '—' },
           qtdAutorizada: p.quantidade,
           qtdRealizada: confirmadas.length,
           statusProcedimento,
           dataValidade: somarDias(guia.dataEmissao, VALIDADE_DIAS),
+          // Data da última sessão confirmada: é ela que define em que período o atendimento entra no espelho.
+          dataRealizacao: confirmadas.length ? confirmadas[confirmadas.length - 1].dataConfirmacao : null,
+          espelhoId: espelhoAtivoDo(p.atendimentoId),
           sessaoPendente: pendente
             ? { id: pendente.id, numeroSessao: pendente.numeroSessao, dataRealizacao: pendente.dataRealizacao }
             : null
