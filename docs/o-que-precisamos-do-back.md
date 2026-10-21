@@ -16,7 +16,8 @@ Erros sempre no formato da US000-12: `{ "codigo": "...", "mensagem": "..." }`. A
   existem (check mútuo pelo `Guia_Proc.Status`, espelho com vários atendimentos pelo `Espelho_Item`).
 - **Ajustar issues existentes:** #41 (contrato do login), #75 e #76 (campos a mais no DTO),
   **#77 (aprovação dupla: médico + chefe)**, #72 e #92 (check mútuo), **US001-4 e US001-5 (espelho com
-  vários atendimentos, correção e reenvio)**.
+  vários atendimentos do mês, correção e reenvio)**, **US001-6/US001-7 e US002-3 (fatura mensal por OCS,
+  sem gerar/regerar manual)**.
 - **Criar issues novas:** autocadastro, usuários, OCS, procedimentos (listar e cadastrar), contratos, médicos, busca de
   beneficiários, criar/editar pré-guia, confirmar/recusar atendimento, aprovar/reprovar e reenviar espelho.
 
@@ -36,7 +37,7 @@ exatamente os contratos abaixo e servem de referência para o back.
 
 Militares da equipe também são beneficiários (ver item 1), então escolhem o perfil depois de entrar.
 Autocadastro: Prec-CP `123456` + nascimento `21/07/1990`. Para zerar os dados, apague a chave
-`fusex-banco-mock-v5` do Local Storage. Para testar o check mútuo, abra a OCS e o beneficiário em duas
+`fusex-banco-mock-v6` do Local Storage. Para testar o check mútuo, abra a OCS e o beneficiário em duas
 abas do mesmo navegador (cada aba tem o seu login).
 
 ---
@@ -136,7 +137,7 @@ O espelho é a junção dos atendimentos realizados pela OCS no período que ela
 
 | | O quê | Issue |
 |---|---|---|
-| 🔧 | `POST /espelhos` com `{ ocsId, dataInicio, dataFim, itens: [{ atendimentoId, valor }] }`. O back preenche `beneficiarioId` e `descricao` (nome do procedimento). Regras: atendimento da OCS e `REALIZADA` (422 `ATENDIMENTO_NAO_REALIZADO`), realizado no período (422 `FORA_DO_PERIODO`), fora de outro espelho (409 `ATENDIMENTO_JA_EM_ESPELHO`), valor > 0 (400 `VALOR_INVALIDO`). **`Espelho.Atendimento_ID` (que é `NOT NULL` e `UNIQUE`) recebe o primeiro atendimento da lista** — como cada atendimento só entra em um espelho, a trava continua valendo | US001-4 |
+| 🔧 | `POST /espelhos` com `{ ocsId, dataInicio, dataFim, itens: [{ atendimentoId, valor }] }`. O back preenche `beneficiarioId` e `descricao` (nome do procedimento). Regras: atendimento da OCS e `REALIZADA` (422 `ATENDIMENTO_NAO_REALIZADO`), realizado no período (422 `FORA_DO_PERIODO`), **período inteiro dentro do mês atual** (422 `FORA_DO_MES`: o espelho entra na fatura do mês em que é enviado), fora de outro espelho (409 `ATENDIMENTO_JA_EM_ESPELHO`), valor > 0 (400 `VALOR_INVALIDO`). **`Espelho.Atendimento_ID` (que é `NOT NULL` e `UNIQUE`) recebe o primeiro atendimento da lista** — como cada atendimento só entra em um espelho, a trava continua valendo | US001-4 |
 | ✅ | `GET /espelhos?cnpj=` — a OCS só vê os dela | US001-5 |
 
 **Correção e reenvio pela OCS** — o espelho reprovado volta para a OCS, que corrige **o mesmo
@@ -155,7 +156,7 @@ espelho** (não cria outro, e por isso o `UNIQUE` não atrapalha) e reenvia:
 | ✅ | `GET /espelhos` (receber) | US001-5 |
 | 🔧 | `GET /espelhos/{id}/itens` — voltar a mandar `atendimentoId` (a US000-14 tirou) e acrescentar `valorContratado` (o back já tem `obterValorContratado`, US001-2; `null` sem contrato) | US000-14 |
 | 🔧 | Acrescentar `motivoReprovacao` no `EspelhoResumoResponse` | US000-14 |
-| 🆕 | `PATCH /espelhos/{id}/aprovar` e `PATCH /espelhos/{id}/reprovar` com `{ motivo }` → status `APROVADO` / `REPROVADO` (só no enum `StatusEspelho`; a coluna `Status VARCHAR(20)` já comporta). Grava o histórico. Erros: 409 `ESPELHO_JA_AUDITADO`, 400 `MOTIVO_OBRIGATORIO` | — |
+| 🆕 | `PATCH /espelhos/{id}/aprovar` e `PATCH /espelhos/{id}/reprovar` com `{ motivo }` → status `APROVADO` / `REPROVADO` (só no enum `StatusEspelho`; a coluna `Status VARCHAR(20)` já comporta). Grava o histórico. **Ao aprovar, inclui o espelho na fatura mensal da OCS (item 8)** e devolve também `faturaId` e `competencia`. Erros: 409 `ESPELHO_JA_AUDITADO`, 400 `MOTIVO_OBRIGATORIO`, 409 `FATURA_JA_ENCAMINHADA` | — |
 | ✅ | `GET /guias/{id}/historico` (o `id` é do Guia_Proc = atendimento) e `GET /espelhos/{id}/historico` | US001-3 |
 
 **Pontuação (calculada no front, não precisa de back):** para cada atendimento, 100 quando o valor
@@ -169,8 +170,24 @@ ALTER TABLE Espelho ADD COLUMN Motivo_Reprovacao VARCHAR(255);
 É um `ADD COLUMN` que aceita nulo: não mexe em nenhum dado existente. O cuidado é só com o **número
 da migration**, que deve ser o próximo depois que o time resolver as V7/V8/V10 duplicadas.
 
+## 8. Fatura mensal por OCS — sem mudança no banco
+
+Uma fatura por OCS por mês, com todos os espelhos **aprovados** daquele mês. Não existe mais gerar
+fatura de um espelho nem **regerar**: quem cria e alimenta a fatura é a aprovação do espelho.
+
+| | O quê | Issue |
+|---|---|---|
+| 🔧 | Ao aprovar um espelho: procura a fatura `ATIVA` da OCS no mês do espelho; se não existe, cria. Cria um `Item_Fatura` para cada `Espelho_Item` (valor apresentado, valor contratado e divergência, como a US001-6 já faz). `Fatura.Esp_Fat` e `Fatura.Guia_Proc_ID` (`NOT NULL`) ficam com o primeiro espelho/atendimento; os demais entram pelos itens | US001-6 |
+| 🔧 | `GET /faturas?cnpj=&competencia=AAAA-MM` → `[{ id, ocsId, ocsNome, competencia, status, quantidadeEspelhos, quantidadeItens, valorApresentado, valorContratado, espelhosPendentes, dataGeracao, dataEncaminhamento }]`. A `competencia` sai do período dos espelhos da fatura (todos do mesmo mês). `espelhosPendentes` = espelhos da OCS no mês ainda `EM_ABERTO` ou `REPROVADO` | US001-7 |
+| 🔧 | `GET /faturas/{id}` → o resumo + `espelhos: [{ espelhoId, dataInicio, dataFim, itens: [{ id, atendimentoId, descricao, beneficiarioId, valorApresentado, valorContratado, divergenciaValor }] }]` e `pendentes: [{ espelhoId, status }]` | US001-7 |
+| 🔧 | `POST /faturas/{id}/encaminhar` — só depois que o mês acabou (422 `MES_NAO_ENCERRADO`) e sem espelho pendente do mês (422 `AUDITORIA_PENDENTE`). A regra antiga de "item não autorizado" sai: os itens já passaram pelo auditor no espelho | US002-3 |
+| ❌ | **Tirar** `POST /faturas` (gerar a partir de um espelho) e `POST /faturas/{id}/regerar` do uso — o front não chama mais | US001-6, US001-7 |
+
+Status: `ATIVA` (aberta, recebendo espelhos) → `ENCAMINHADA_APROVACAO`. O `REGERADA` deixa de ser usado.
+
 ## Ainda no front, fora deste pacote
 
-- As telas de faturas, lisura, divergências e a antiga tela de atendimento por QR ainda chamam `axios`
-  com `http://localhost:8080` fixo (sem token). A tela antiga `/pre-guias` (US006-5) continua no router
+- A tela antiga de faturas (gerar/regerar, lisura, divergências) saiu do menu e da rota: o auditor usa
+  "Faturas mensais". Os arquivos antigos (`src/views/Faturas/`) continuam no repositório, sem uso.
+- A antiga tela de atendimento por QR ainda chama `axios` com `http://localhost:8080` fixo (sem token). A tela antiga `/pre-guias` (US006-5) continua no router
   só para o CHEFE, fora do menu.
