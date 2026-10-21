@@ -87,7 +87,7 @@ onMounted(carregar)
   <main class="fx-pagina">
     <div class="fx-conteudo fx-conteudo-largo">
       <div>
-        <router-link to="/espelhos" class="voltar">← Voltar</router-link>
+        <router-link to="/ocs/espelhos" class="voltar">← Voltar</router-link>
       </div>
       <header>
         <h1 class="fx-titulo">Corrigir espelho #{{ id }}</h1>

@@ -2,21 +2,21 @@ export const PERFIS = {
   CHEFE: {
     rotulo: 'Chefe do FUSEx',
     descricao: 'Aprovar pré-guias e cadastrar usuários, OCS e contratos.',
-    rotaInicial: '/aprovacao',
+    rotaInicial: '/chefe/aprovacao',
     menu: [
-      { rotulo: 'Pré-guias para aprovar', rota: '/aprovacao' },
-      { rotulo: 'Usuários e perfis', rota: '/usuarios' },
-      { rotulo: 'OCS credenciadas', rota: '/ocs' },
-      { rotulo: 'Contratos', rota: '/contratos' }
+      { rotulo: 'Pré-guias para aprovar', rota: '/chefe/aprovacao' },
+      { rotulo: 'Usuários e perfis', rota: '/chefe/usuarios' },
+      { rotulo: 'OCS credenciadas', rota: '/chefe/ocs' },
+      { rotulo: 'Contratos', rota: '/chefe/contratos' }
     ]
   },
   MEDICO: {
     rotulo: 'Médico',
     descricao: 'Criar solicitações de exame e aprovar pré-guias.',
-    rotaInicial: '/aprovacao',
+    rotaInicial: '/medico/aprovacao',
     menu: [
       { rotulo: 'Nova solicitação', rota: '/medico/nova-solicitacao' },
-      { rotulo: 'Pré-guias para aprovar', rota: '/aprovacao' }
+      { rotulo: 'Pré-guias para aprovar', rota: '/medico/aprovacao' }
     ]
   },
   EMISSOR: {
@@ -32,10 +32,10 @@ export const PERFIS = {
   BENEFICIARIO: {
     rotulo: 'Beneficiário',
     descricao: 'Confirmar os atendimentos e acompanhar suas guias.',
-    rotaInicial: '/confirmar-atendimento',
+    rotaInicial: '/beneficiario/confirmar-atendimento',
     menu: [
-      { rotulo: 'Confirmar atendimento', rota: '/confirmar-atendimento' },
-      { rotulo: 'Minhas guias', rota: '/minhas-guias' }
+      { rotulo: 'Confirmar atendimento', rota: '/beneficiario/confirmar-atendimento' },
+      { rotulo: 'Minhas guias', rota: '/beneficiario/minhas-guias' }
     ]
   },
   AUDITOR: {
@@ -44,7 +44,7 @@ export const PERFIS = {
     rotaInicial: '/auditor/espelhos',
     menu: [
       { rotulo: 'Espelhos recebidos', rota: '/auditor/espelhos' },
-      { rotulo: 'Faturas mensais', rota: '/faturas' },
+      { rotulo: 'Faturas mensais', rota: '/auditor/faturas' },
       { rotulo: 'Histórico', rota: '/auditor/historico' }
     ]
   },
@@ -54,7 +54,7 @@ export const PERFIS = {
     rotaInicial: '/ocs/atendimentos',
     menu: [
       { rotulo: 'Atendimentos', rota: '/ocs/atendimentos' },
-      { rotulo: 'Espelhos', rota: '/espelhos' }
+      { rotulo: 'Espelhos', rota: '/ocs/espelhos' }
     ]
   }
 }

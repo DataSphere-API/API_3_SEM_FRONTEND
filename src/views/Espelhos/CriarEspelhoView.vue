@@ -102,7 +102,7 @@ async function enviar() {
       dataFim: dataFim.value,
       itens: escolhidos.value.map(a => ({ atendimentoId: a.atendimentoId, valor: Number(valores.value[a.atendimentoId]) }))
     })
-    router.push('/espelhos')
+    router.push('/ocs/espelhos')
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível enviar o espelho.'
   } finally {
@@ -117,7 +117,7 @@ onMounted(carregar)
   <main class="fx-pagina">
     <form class="fx-conteudo fx-conteudo-largo" novalidate @submit.prevent="enviar">
       <div>
-        <router-link to="/espelhos" class="voltar">← Voltar</router-link>
+        <router-link to="/ocs/espelhos" class="voltar">← Voltar</router-link>
       </div>
       <header>
         <h1 class="fx-titulo">Novo espelho</h1>
@@ -213,7 +213,7 @@ onMounted(carregar)
       <div class="rodape">
         <strong>{{ escolhidos.length }} atendimento(s) · Total: <span class="fx-mono">{{ formatarMoeda(total) }}</span></strong>
         <div class="fx-acoes">
-          <router-link to="/espelhos" class="fx-botao-secundario link-botao">Cancelar</router-link>
+          <router-link to="/ocs/espelhos" class="fx-botao-secundario link-botao">Cancelar</router-link>
           <button type="submit" class="fx-botao" :disabled="enviando || carregando">
             {{ enviando ? 'Enviando...' : 'Enviar espelho para auditoria' }}
           </button>

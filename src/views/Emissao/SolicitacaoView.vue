@@ -199,7 +199,7 @@ onMounted(carregar)
         </div>
         <div class="fx-acoes">
           <button type="button" class="fx-botao" @click="novaSolicitacao">Criar outra</button>
-          <router-link v-if="ehMedico" to="/aprovacao" class="fx-botao-secundario link-botao">Ir para as aprovações</router-link>
+          <router-link v-if="ehMedico" to="/medico/aprovacao" class="fx-botao-secundario link-botao">Ir para as aprovações</router-link>
           <router-link v-else to="/emissor/acompanhamento" class="fx-botao-secundario link-botao">Ir para o acompanhamento</router-link>
         </div>
       </section>

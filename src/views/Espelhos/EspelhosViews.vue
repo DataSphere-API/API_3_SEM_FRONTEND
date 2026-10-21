@@ -63,7 +63,7 @@ onMounted(carregar)
           <h1 class="fx-titulo">Espelhos</h1>
           <p class="fx-subtitulo">Os espelhos que a clínica enviou para a auditoria do FUSEx.</p>
         </div>
-        <router-link to="/espelhos/novo" class="fx-botao link-botao">Novo espelho</router-link>
+        <router-link to="/ocs/espelhos/novo" class="fx-botao link-botao">Novo espelho</router-link>
       </header>
 
       <p v-if="route.query.reenviado" class="fx-alerta fx-alerta-verde" role="status">
@@ -74,7 +74,7 @@ onMounted(carregar)
         <h2 class="fx-secao-titulo">Devolvidos pelo auditor</h2>
         <div v-for="e in reprovados" :key="e.id" class="reprovado">
           <span><span class="fx-mono">#{{ e.id }}</span> · {{ e.motivoReprovacao }}</span>
-          <router-link :to="`/espelhos/${e.id}/corrigir`" class="fx-botao link-botao">Corrigir e reenviar</router-link>
+          <router-link :to="`/ocs/espelhos/${e.id}/corrigir`" class="fx-botao link-botao">Corrigir e reenviar</router-link>
         </div>
       </section>
 
@@ -155,7 +155,7 @@ onMounted(carregar)
             </table>
           </div>
           <div v-if="aberto.status === 'REPROVADO'">
-            <router-link :to="`/espelhos/${aberto.id}/corrigir`" class="fx-botao link-botao">Corrigir e reenviar</router-link>
+            <router-link :to="`/ocs/espelhos/${aberto.id}/corrigir`" class="fx-botao link-botao">Corrigir e reenviar</router-link>
           </div>
         </article>
       </template>
