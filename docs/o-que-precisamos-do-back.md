@@ -15,7 +15,7 @@ Erros sempre no formato da US000-12: `{ "codigo": "...", "mensagem": "..." }`. A
 - **Banco:** só **2 colunas novas** — `Sessao_Procedimento.Data_Confirmacao` e `Espelho.Motivo_Reprovacao`.
 - **Ajustar issues existentes:** #41 (contrato do login), #75 e #76 (campos a mais no DTO),
   **#77 (aprovação dupla: médico + chefe)**, #72 e #92 (check mútuo).
-- **Criar issues novas:** autocadastro, usuários, OCS, procedimentos, contratos, médicos, busca de
+- **Criar issues novas:** autocadastro, usuários, OCS, procedimentos (listar e cadastrar), contratos, médicos, busca de
   beneficiários, criar/editar pré-guia, confirmar/recusar sessão, aprovar/reprovar espelho.
 
 ## Como testar o front sem o back
@@ -63,7 +63,7 @@ mostra `cargo · nome da OCS`.
 |---|---|---|
 | 🆕 | `POST /auth/cadastro` (sem login) com `{ precCp, dataNascimento, cpf, senha }`. Confere Prec-CP + data de nascimento na tabela `Beneficiario`, cria o `Usuario` e preenche `Beneficiario.Usuario_ID`. Resposta `{ id, nome }`. Erros: 422 `BENEFICIARIO_NAO_CONFERE`, 409 `BENEFICIARIO_JA_CADASTRADO`, 409 `CPF_JA_CADASTRADO` | O beneficiário se cadastra sozinho (decisão da reunião) |
 | 🆕 | `GET /usuarios` → lista no formato do `usuario` do login | Tela do chefe |
-| 🆕 | `POST /usuarios` — militar: `{ tipo: "MILITAR", precCp, cpf, senha, perfis: ["MEDICO", ...], crm }` → cria as linhas em `Medico`/`Analista`/`Chefe_Fusex`/`Auditor` pelo `Benef_ID`. **Se o Prec-CP já tem usuário, só acrescenta os perfis.** Funcionário de OCS: `{ tipo: "OCS", cpf, senha, ocsCnpj, cargo }` → linha em `FunOcs`. Erros: 404 `BENEFICIARIO_NAO_ENCONTRADO`, 409 `CPF_JA_CADASTRADO`, 422 `PERFIL_OBRIGATORIO`, 422 `MEDICO_SEM_CRM`, 422 `OCS_NAO_ENCONTRADA` | Escopo: chefe cadastra emissor e médico |
+| 🆕 | `POST /usuarios` — militar: `{ tipo: "MILITAR", precCp, cpf, senha, perfis: ["MEDICO", ...], crm }` → cria as linhas em `Medico`/`Analista`/`Chefe_Fusex`/`Auditor` pelo `Benef_ID`. **Se o Prec-CP já tem usuário, só acrescenta os perfis — nesse caso o front não manda `cpf` nem `senha`** (o login e a senha continuam os da pessoa). Funcionário de OCS: `{ tipo: "OCS", cpf, senha, ocsCnpj, cargo }` → linha em `FunOcs`. Erros: 404 `BENEFICIARIO_NAO_ENCONTRADO`, 409 `CPF_JA_CADASTRADO`, 422 `PERFIL_OBRIGATORIO`, 422 `MEDICO_SEM_CRM`, 422 `OCS_NAO_ENCONTRADA` | Escopo: chefe cadastra emissor e médico |
 | 🆕 | `GET /medicos` → `[{ id, nome, crm }]` (o `id` é o do usuário) | O emissor escolhe o médico responsável |
 | 🆕 | `GET /beneficiarios?busca=` → `[{ precCp, nome, dataNascimento, dependente, ug }]` (nome ou Prec-CP) | Escolher o paciente e o militar |
 
@@ -75,7 +75,7 @@ mostra `cargo · nome da OCS`.
 | | O quê |
 |---|---|
 | 🆕 | `GET /ocs` e `POST /ocs` com `{ cnpj, nome }`. Erro 409 `OCS_JA_CADASTRADA` |
-| 🆕 | `GET /procedimentos` → `[{ id, nome }]` |
+| 🆕 | `GET /procedimentos` → `[{ id, nome }]` e `POST /procedimentos` com `{ nome }` → `{ id, nome }`. Erro 409 `PROCEDIMENTO_JA_CADASTRADO` (mesmo nome, sem diferenciar maiúsculas) |
 | 🆕 | `GET /contratos` → `[{ id, ocsCnpj, procedimentoId, valor, ocsNome, procedimentoNome }]` e `POST /contratos` com `{ ocsCnpj, procedimentoId, valor }`. Erros: 422 `VALOR_INVALIDO`, 409 `CONTRATO_DUPLICADO` (mesmo procedimento + OCS) |
 
 **Banco: nada.** Ficou fora: nome fantasia, endereço, telefone, tipo de serviço, OCS ativa, número e
