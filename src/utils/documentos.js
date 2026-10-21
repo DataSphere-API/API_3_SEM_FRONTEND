@@ -38,10 +38,6 @@ export function formatarCnpj(valor) {
     .replace(/(\d{4})(\d)/, '$1-$2')
 }
 
-export function emailValido(valor) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(valor ?? '').trim())
-}
-
 export function formatarData(valor) {
   if (!valor) return '—'
   const data = new Date(valor.length === 10 ? `${valor}T00:00:00` : valor)

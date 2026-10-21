@@ -1,7 +1,7 @@
 import { api } from './http.js'
 import {
   mockListarContratos,
-  mockSalvarContrato,
+  mockCriarContrato,
   mockListarProcedimentos
 } from '../mocks/cadastrosMock.js'
 import { traduzirErro } from '../utils/erros.js'
@@ -18,13 +18,13 @@ export async function listarContratos() {
   }
 }
 
-export async function salvarContrato(dados, id = null) {
+export async function criarContrato(dados) {
   try {
-    if (USAR_MOCK) return await mockSalvarContrato(dados, id)
-    const response = id ? await api.put(`/contratos/${id}`, dados) : await api.post('/contratos', dados)
+    if (USAR_MOCK) return await mockCriarContrato(dados)
+    const response = await api.post('/contratos', dados)
     return response.data
   } catch (erro) {
-    throw traduzirErro(erro, { 409: 'Já existe contrato desse procedimento com essa OCS no mesmo período.' })
+    throw traduzirErro(erro, { 409: 'Já existe contrato desse procedimento com essa OCS.' })
   }
 }
 

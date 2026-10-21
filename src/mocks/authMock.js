@@ -1,10 +1,18 @@
-import { banco, persistir, proximoId } from './bancoMock.js'
+import { banco, persistir, proximoId, nomeDoUsuario } from './bancoMock.js'
 import { erroHttp, esperar } from './auxiliares.js'
 import { somenteDigitos } from '../utils/documentos.js'
 
 export function usuarioPublico(usuario) {
-  const { senha, ...publico } = usuario
-  return publico
+  return {
+    id: usuario.id,
+    nome: nomeDoUsuario(usuario),
+    cpf: usuario.cpf,
+    perfis: [...usuario.perfis],
+    precCp: usuario.precCp,
+    crm: usuario.crm,
+    ocsCnpj: usuario.ocsCnpj,
+    cargo: usuario.cargo
+  }
 }
 
 export async function mockLogin(cpf, senha) {
@@ -12,9 +20,6 @@ export async function mockLogin(cpf, senha) {
   const usuario = banco().usuarios.find(u => u.cpf === somenteDigitos(cpf))
   if (!usuario || usuario.senha !== senha) {
     throw erroHttp(401, { codigo: 'CREDENCIAIS_INVALIDAS', mensagem: 'CPF ou senha incorretos.' })
-  }
-  if (!usuario.ativo) {
-    throw erroHttp(403, { codigo: 'USUARIO_INATIVO', mensagem: 'Seu acesso está desativado. Procure a Chefia do FUSEx.' })
   }
   return { token: `mock-token-${usuario.id}`, usuario: usuarioPublico(usuario) }
 }
@@ -29,32 +34,25 @@ export async function mockCadastrarBeneficiario(dados) {
       mensagem: 'Não encontramos um beneficiário com esse Prec-CP e data de nascimento.'
     })
   }
-  if (db.usuarios.some(u => u.precCp === dados.precCp && u.perfis.includes('BENEFICIARIO'))) {
+  if (db.usuarios.some(u => u.precCp === dados.precCp)) {
     throw erroHttp(409, {
       codigo: 'BENEFICIARIO_JA_CADASTRADO',
-      mensagem: 'Este beneficiário já tem cadastro. Entre com seu CPF e senha.'
+      mensagem: 'Este beneficiário já tem acesso. Entre com seu CPF e senha.'
     })
   }
   if (db.usuarios.some(u => u.cpf === dados.cpf)) {
     throw erroHttp(409, { codigo: 'CPF_JA_CADASTRADO', mensagem: 'Este CPF já tem acesso ao sistema.' })
   }
-
-  const usuario = {
+  db.usuarios.push({
     id: proximoId(db.usuarios),
-    nome: beneficiario.nome,
     cpf: dados.cpf,
-    postoGraduacao: '',
-    email: dados.email,
-    telefone: dados.telefone,
+    senha: dados.senha,
     perfis: ['BENEFICIARIO'],
     precCp: dados.precCp,
     crm: '',
-    crmUf: '',
     ocsCnpj: '',
-    ativo: true,
-    senha: dados.senha
-  }
-  db.usuarios.push(usuario)
+    cargo: ''
+  })
   persistir()
-  return { id: usuario.id, nome: usuario.nome }
+  return { id: db.usuarios[db.usuarios.length - 1].id, nome: beneficiario.nome }
 }
