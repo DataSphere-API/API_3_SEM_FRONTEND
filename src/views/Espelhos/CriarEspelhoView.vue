@@ -37,6 +37,7 @@
               v-model="form.ocsId"
               type="text"
               placeholder="00000000000000"
+              readonly
               required
             />
           </div>
@@ -131,13 +132,14 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { criarEspelho } from '../../services/espelhoService.js'
+import { sessao } from '../../stores/sessao.js'
 
 const router = useRouter()
 
 const form = reactive({
   atendimentoId: null,
-  ocsId: '',
+  ocsId: sessao.usuario?.ocsCnpj || '',
   itens: [
     {
       beneficiarioId: '',
@@ -167,7 +169,7 @@ async function enviar() {
   enviando.value = true
 
   try {
-    await axios.post('http://localhost:8080/espelhos', {
+    await criarEspelho({
       atendimentoId: form.atendimentoId,
       ocsId: form.ocsId,
       itens: form.itens
@@ -175,9 +177,7 @@ async function enviar() {
 
     router.push('/espelhos')
   } catch (error) {
-    erro.value =
-      error.response?.data ||
-      'Não foi possível criar o espelho.'
+    erro.value = error.mensagemUsuario || 'Não foi possível criar o espelho.'
   } finally {
     enviando.value = false
   }

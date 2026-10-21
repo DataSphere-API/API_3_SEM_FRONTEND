@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import axios from 'axios'
+import { listarEspelhos } from '../../services/espelhoService.js'
+import { sessao } from '../../stores/sessao.js'
 import EspelhosList from './components/EspelhosList.vue'
 import EspelhoDetalhes from './components/EspelhoDetalhes.vue'
 
@@ -10,9 +11,10 @@ const espelhos = ref([])
 
 async function carregarEspelhos() {
   try {
-    const response = await axios.get('http://localhost:8080/espelhos')
+    // A OCS vê só os espelhos dela.
+    const lista = await listarEspelhos({ cnpj: sessao.usuario?.ocsCnpj })
 
-    espelhos.value = response.data.map(espelho => ({
+    espelhos.value = lista.map(espelho => ({
       ...espelho,
       ocs: espelho.ocsNome || espelho.ocsId,
       data: `${espelho.dataInicio} - ${espelho.dataFim}`,
