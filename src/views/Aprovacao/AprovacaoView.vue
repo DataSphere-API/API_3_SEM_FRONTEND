@@ -1,15 +1,21 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import PreGuiaResumo from '../../components/PreGuiaResumo.vue'
-import { listarPreGuiasDoFluxo, decidirPreGuia } from '../../services/fluxoPreGuiaService.js'
+import {
+  listarPreGuiasDoFluxo,
+  buscarPreGuiaDoFluxo,
+  aprovarPreGuia,
+  reprovarPreGuia
+} from '../../services/fluxoPreGuiaService.js'
 import { sessao } from '../../stores/sessao.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
-import { CARATER, seloDecisao, seloStatus } from '../../utils/fluxoPreGuia.js'
+import { numeroPreGuia, seloAprovacao, seloStatus } from '../../utils/fluxoPreGuia.js'
 
-const meuCampo = sessao.perfilAtivo === 'MEDICO' ? 'aprovacaoMedico' : 'aprovacaoChefe'
-const outroCampo = meuCampo === 'aprovacaoMedico' ? 'aprovacaoChefe' : 'aprovacaoMedico'
-const outroRotulo = meuCampo === 'aprovacaoMedico' ? 'Chefe do FUSEx' : 'Médico'
+const souMedico = sessao.perfilAtivo === 'MEDICO'
+const meuCampo = souMedico ? 'medicoAprovou' : 'chefeAprovou'
+const outroCampo = souMedico ? 'chefeAprovou' : 'medicoAprovou'
+const outroRotulo = souMedico ? 'Chefe do FUSEx' : 'Médico'
 
 const aba = ref('pendentes')
 const preGuias = ref([])
@@ -17,33 +23,26 @@ const carregando = ref(false)
 const erro = ref('')
 const aviso = ref('')
 const selecionada = ref(null)
-const observacao = ref('')
+const carregandoDetalhe = ref(false)
+const motivo = ref('')
+const reprovando = ref(false)
 const erroDecisao = ref('')
 const decidindo = ref(false)
 
-const lista = computed(() => {
-  if (aba.value === 'pendentes') {
-    return preGuias.value.filter(p => p.status === 'AGUARDANDO_APROVACAO' && p[meuCampo].decisao === 'PENDENTE')
-  }
-  return preGuias.value.filter(p => p[meuCampo].decisao !== 'PENDENTE')
+const pendentes = computed(() => preGuias.value.filter(p => p.status === 'VALIDADA' && !p[meuCampo]))
+const lista = computed(() => (aba.value === 'pendentes' ? pendentes.value : preGuias.value))
+
+const minhaAprovacaoPendente = computed(() => {
+  const p = selecionada.value
+  if (!p || p.status !== 'VALIDADA') return false
+  return souMedico ? !p.dataAprovacaoMedico : !p.dataAprovacaoChefe
 })
-
-const totalPendentes = computed(
-  () => preGuias.value.filter(p => p.status === 'AGUARDANDO_APROVACAO' && p[meuCampo].decisao === 'PENDENTE').length
-)
-
-const podeDecidir = computed(
-  () => selecionada.value?.status === 'AGUARDANDO_APROVACAO' && selecionada.value[meuCampo].decisao === 'PENDENTE'
-)
 
 async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    // Urgentes primeiro, depois as mais antigas.
-    preGuias.value = (await listarPreGuiasDoFluxo()).sort(
-      (a, b) => (a.carater === 'URGENCIA' ? 0 : 1) - (b.carater === 'URGENCIA' ? 0 : 1) || a.criadaEm.localeCompare(b.criadaEm)
-    )
+    preGuias.value = (await listarPreGuiasDoFluxo()).sort((a, b) => a.dataCriacao.localeCompare(b.dataCriacao))
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar as pré-guias.'
   } finally {
@@ -51,35 +50,53 @@ async function carregar() {
   }
 }
 
-function abrir(preGuia) {
+async function abrir(id) {
   aviso.value = ''
   erroDecisao.value = ''
-  observacao.value = ''
-  selecionada.value = preGuia
+  motivo.value = ''
+  reprovando.value = false
+  carregandoDetalhe.value = true
+  try {
+    selecionada.value = await buscarPreGuiaDoFluxo(id)
+  } catch (e) {
+    erro.value = e.mensagemUsuario || 'Não foi possível abrir a pré-guia.'
+  } finally {
+    carregandoDetalhe.value = false
+  }
 }
 
-async function decidir(acao) {
+async function aprovar() {
   erroDecisao.value = ''
-  if (acao !== 'aprovar' && !observacao.value.trim()) {
-    erroDecisao.value = 'Escreva a observação para devolver ou negar.'
+  decidindo.value = true
+  try {
+    const resposta = await aprovarPreGuia(selecionada.value.id)
+    aviso.value =
+      resposta.status === 'APROVADA'
+        ? `${numeroPreGuia(resposta.preGuiaId)} aprovada. Com as duas aprovações, ela já foi para o emissor.`
+        : `${numeroPreGuia(resposta.preGuiaId)} aprovada. Falta a aprovação do ${outroRotulo}.`
+    selecionada.value = null
+    await carregar()
+  } catch (e) {
+    erroDecisao.value = e.mensagemUsuario || 'Não foi possível aprovar.'
+  } finally {
+    decidindo.value = false
+  }
+}
+
+async function reprovar() {
+  erroDecisao.value = ''
+  if (!motivo.value.trim()) {
+    erroDecisao.value = 'Escreva o motivo da reprovação.'
     return
   }
   decidindo.value = true
   try {
-    const atualizada = await decidirPreGuia(selecionada.value.id, acao, observacao.value)
-    const textos = {
-      aprovar:
-        atualizada.status === 'APROVADA'
-          ? 'aprovada. Com as duas aprovações, ela já foi para o emissor.'
-          : `aprovada. Falta a decisão do ${outroRotulo}.`,
-      devolver: 'devolvida ao emissor para correção.',
-      reprovar: 'negada.'
-    }
-    aviso.value = `Pré-guia ${atualizada.numero} ${textos[acao]}`
+    const resposta = await reprovarPreGuia(selecionada.value.id, motivo.value)
+    aviso.value = `${numeroPreGuia(resposta.preGuiaId)} reprovada.`
     selecionada.value = null
     await carregar()
   } catch (e) {
-    erroDecisao.value = e.mensagemUsuario || 'Não foi possível registrar a decisão.'
+    erroDecisao.value = e.mensagemUsuario || 'Não foi possível reprovar.'
   } finally {
     decidindo.value = false
   }
@@ -110,49 +127,44 @@ onMounted(carregar)
             :aria-selected="aba === 'pendentes'"
             @click="aba = 'pendentes'"
           >
-            Aguardando você<template v-if="!carregando"> ({{ totalPendentes }})</template>
+            Aguardando você<template v-if="!carregando"> ({{ pendentes.length }})</template>
           </button>
           <button
             type="button"
             role="tab"
             class="fx-botao-secundario"
-            :class="{ 'aba-ativa': aba === 'decididas' }"
-            :aria-selected="aba === 'decididas'"
-            @click="aba = 'decididas'"
+            :class="{ 'aba-ativa': aba === 'todas' }"
+            :aria-selected="aba === 'todas'"
+            @click="aba = 'todas'"
           >
-            Já decididas por mim
+            Todas
           </button>
         </div>
 
-        <p v-if="carregando" class="fx-alerta fx-alerta-cinza">Carregando pré-guias...</p>
+        <p v-if="carregando || carregandoDetalhe" class="fx-alerta fx-alerta-cinza">Carregando...</p>
         <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
         <p v-if="!carregando && !erro && lista.length === 0" class="fx-alerta fx-alerta-cinza">
-          {{ aba === 'pendentes' ? 'Nenhuma pré-guia aguardando a sua decisão.' : 'Você ainda não decidiu nenhuma pré-guia.' }}
+          {{ aba === 'pendentes' ? 'Nenhuma pré-guia aguardando a sua aprovação.' : 'Nenhuma pré-guia.' }}
         </p>
 
         <ul v-if="!carregando && !erro" class="fx-lista">
           <li v-for="p in lista" :key="p.id" class="fx-cartao">
             <div class="cartao-topo">
-              <span class="fx-mono"><strong>{{ p.numero }}</strong></span>
-              <span class="selos">
-                <span v-if="p.carater === 'URGENCIA'" class="fx-selo fx-selo-vermelho">{{ CARATER.URGENCIA }}</span>
-                <span class="fx-selo" :class="seloStatus(p.status).classe">{{ seloStatus(p.status).texto }}</span>
-              </span>
+              <span class="fx-mono"><strong>{{ numeroPreGuia(p.id) }}</strong></span>
+              <span class="fx-selo" :class="seloStatus(p.status).classe">{{ seloStatus(p.status).texto }}</span>
             </div>
             <p class="linha">
-              <strong>{{ p.beneficiario.nome }}</strong> ·
-              {{ p.procedimentos.map(x => x.nome).join(', ') }}
+              <strong>{{ p.beneficiarioNome }}</strong> · {{ p.qtdProcedimentos }} procedimento(s) · {{ formatarMoeda(p.valorTotal) }}
             </p>
             <div class="cartao-rodape">
               <span class="fx-suave">
-                {{ formatarData(p.criadaEm) }} · {{ formatarMoeda(p.valorTotal) }} ·
-                {{ outroRotulo }}:
-                <span class="fx-selo" :class="seloDecisao(p[outroCampo].decisao).classe">
-                  {{ seloDecisao(p[outroCampo].decisao).texto }}
+                Criada em {{ formatarData(p.dataCriacao) }} · {{ outroRotulo }}:
+                <span class="fx-selo" :class="seloAprovacao(p.status, p[outroCampo]).classe">
+                  {{ seloAprovacao(p.status, p[outroCampo]).texto }}
                 </span>
               </span>
-              <button type="button" class="fx-botao" @click="abrir(p)">
-                {{ aba === 'pendentes' ? 'Analisar' : 'Ver detalhes' }}
+              <button type="button" class="fx-botao" @click="abrir(p.id)">
+                {{ p.status === 'VALIDADA' && !p[meuCampo] ? 'Analisar' : 'Ver detalhes' }}
               </button>
             </div>
           </li>
@@ -168,29 +180,28 @@ onMounted(carregar)
           <PreGuiaResumo :pre-guia="selecionada" />
         </article>
 
-        <section v-if="podeDecidir" class="fx-cartao">
+        <section v-if="minhaAprovacaoPendente" class="fx-cartao">
           <h2 class="fx-secao-titulo">Sua decisão</h2>
           <p v-if="erroDecisao" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroDecisao }}</p>
-          <label class="fx-campo">
-            Observação (obrigatória para devolver ou negar)
-            <textarea
-              v-model="observacao"
-              class="fx-entrada fx-texto-longo"
-              placeholder="Ex.: falta o CID e o laudo do exame anterior."
-            ></textarea>
-          </label>
-          <div class="fx-acoes">
-            <button type="button" class="fx-botao" :disabled="decidindo" @click="decidir('aprovar')">Aprovar</button>
-            <button type="button" class="fx-botao-secundario" :disabled="decidindo" @click="decidir('devolver')">
-              Devolver ao emissor
-            </button>
-            <button type="button" class="fx-botao-secundario fx-botao-perigo" :disabled="decidindo" @click="decidir('reprovar')">
-              Negar
+
+          <template v-if="reprovando">
+            <label class="fx-campo">
+              Motivo da reprovação (obrigatório)
+              <textarea v-model="motivo" class="fx-entrada fx-texto-longo" placeholder="Ex.: procedimento sem indicação clínica."></textarea>
+            </label>
+            <div class="fx-acoes">
+              <button type="button" class="fx-botao-secundario fx-botao-perigo" :disabled="decidindo" @click="reprovar">
+                Confirmar reprovação
+              </button>
+              <button type="button" class="fx-botao-secundario" @click="reprovando = false">Cancelar</button>
+            </div>
+          </template>
+          <div v-else class="fx-acoes">
+            <button type="button" class="fx-botao" :disabled="decidindo" @click="aprovar">Aprovar</button>
+            <button type="button" class="fx-botao-secundario fx-botao-perigo" :disabled="decidindo" @click="reprovando = true">
+              Reprovar
             </button>
           </div>
-          <p class="fx-suave">
-            Devolver manda a pré-guia de volta para o emissor corrigir. Negar encerra a solicitação.
-          </p>
         </section>
       </template>
     </div>
@@ -222,11 +233,6 @@ onMounted(carregar)
 .cartao-rodape {
   padding-top: 0.75rem;
   border-top: 1px solid var(--fx-borda);
-}
-
-.selos {
-  display: flex;
-  gap: 0.35rem;
 }
 
 .linha {
