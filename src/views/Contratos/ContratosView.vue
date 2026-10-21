@@ -1,10 +1,8 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import ContratoFormulario from './components/ContratoFormulario.vue'
-import { listarContratos, listarProcedimentos } from '../../services/contratoService.js'
+import { reactive, ref, computed, onMounted } from 'vue'
+import { listarContratos, criarContrato, listarProcedimentos } from '../../services/contratoService.js'
 import { listarOcs } from '../../services/ocsService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
-import { formatarData } from '../../utils/documentos.js'
 
 const contratos = ref([])
 const ocs = ref([])
@@ -12,21 +10,15 @@ const procedimentos = ref([])
 const carregando = ref(false)
 const erro = ref('')
 const aviso = ref('')
+const erroForm = ref('')
+const errosCampo = ref({})
+const salvando = ref(false)
 const filtroOcs = ref('')
-const formularioAberto = ref(false)
-const contratoEditado = ref(null)
-
-const hoje = new Date().toISOString().slice(0, 10)
+const form = reactive({ ocsCnpj: '', procedimentoId: '', valor: '' })
 
 const contratosFiltrados = computed(() =>
   filtroOcs.value ? contratos.value.filter(c => c.ocsCnpj === filtroOcs.value) : contratos.value
 )
-
-function situacao(contrato) {
-  if (contrato.fimVigencia < hoje) return { texto: 'Vencido', classe: 'fx-selo-vermelho' }
-  if (contrato.inicioVigencia > hoje) return { texto: 'Futuro', classe: 'fx-selo-azul' }
-  return { texto: 'Vigente', classe: 'fx-selo-verde' }
-}
 
 async function carregar() {
   carregando.value = true
@@ -47,16 +39,32 @@ async function carregar() {
   }
 }
 
-function abrirFormulario(contrato = null) {
+async function cadastrar() {
   aviso.value = ''
-  contratoEditado.value = contrato
-  formularioAberto.value = true
-}
+  erroForm.value = ''
+  const erros = {}
+  if (!form.ocsCnpj) erros.ocsCnpj = 'Escolha a OCS.'
+  if (!form.procedimentoId) erros.procedimentoId = 'Escolha o procedimento.'
+  if (!(Number(form.valor) > 0)) erros.valor = 'O valor precisa ser maior que zero.'
+  errosCampo.value = erros
+  if (Object.keys(erros).length) return
 
-function aoSalvar(contrato) {
-  aviso.value = `Contrato ${contrato.numero} salvo com sucesso.`
-  formularioAberto.value = false
-  carregar()
+  salvando.value = true
+  try {
+    const novo = await criarContrato({
+      ocsCnpj: form.ocsCnpj,
+      procedimentoId: Number(form.procedimentoId),
+      valor: Number(form.valor)
+    })
+    aviso.value = `Contrato de ${novo.procedimentoNome} com ${novo.ocsNome} cadastrado.`
+    form.procedimentoId = ''
+    form.valor = ''
+    await carregar()
+  } catch (e) {
+    erroForm.value = e.mensagemUsuario || 'Não foi possível cadastrar o contrato.'
+  } finally {
+    salvando.value = false
+  }
 }
 
 onMounted(carregar)
@@ -64,26 +72,55 @@ onMounted(carregar)
 
 <template>
   <main class="fx-pagina">
-    <div class="fx-conteudo fx-conteudo-largo">
-      <header class="fx-topo-pagina">
-        <div>
-          <h1 class="fx-titulo">Contratos</h1>
-          <p class="fx-subtitulo">
-            Valor de cada procedimento por OCS. Só procedimentos com contrato vigente entram numa pré-guia.
-          </p>
-        </div>
-        <button type="button" class="fx-botao" @click="abrirFormulario()">Novo contrato</button>
+    <div class="fx-conteudo">
+      <header>
+        <h1 class="fx-titulo">Contratos</h1>
+        <p class="fx-subtitulo">
+          Quanto o FUSEx paga por procedimento em cada OCS. Só procedimentos com contrato entram numa pré-guia.
+        </p>
       </header>
 
+      <form class="fx-cartao" novalidate @submit.prevent="cadastrar">
+        <h2 class="fx-secao-titulo">Novo contrato</h2>
+        <p v-if="erroForm" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroForm }}</p>
+        <div class="fx-grade">
+          <label class="fx-campo">
+            OCS
+            <select v-model="form.ocsCnpj" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.ocsCnpj }">
+              <option value="" disabled>Escolha a OCS</option>
+              <option v-for="o in ocs" :key="o.cnpj" :value="o.cnpj">{{ o.nome }}</option>
+            </select>
+            <span v-if="errosCampo.ocsCnpj" class="fx-erro-campo">{{ errosCampo.ocsCnpj }}</span>
+          </label>
+          <label class="fx-campo">
+            Procedimento
+            <select v-model="form.procedimentoId" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.procedimentoId }">
+              <option value="" disabled>Escolha o procedimento</option>
+              <option v-for="p in procedimentos" :key="p.id" :value="p.id">{{ p.nome }}</option>
+            </select>
+            <span v-if="errosCampo.procedimentoId" class="fx-erro-campo">{{ errosCampo.procedimentoId }}</span>
+          </label>
+          <label class="fx-campo campo-valor">
+            Valor (R$)
+            <input v-model="form.valor" type="number" min="0.01" step="0.01" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.valor }" />
+            <span v-if="errosCampo.valor" class="fx-erro-campo">{{ errosCampo.valor }}</span>
+          </label>
+        </div>
+        <div>
+          <button type="submit" class="fx-botao" :disabled="salvando">{{ salvando ? 'Salvando...' : 'Cadastrar' }}</button>
+        </div>
+      </form>
+
+      <p v-if="aviso" class="fx-alerta fx-alerta-verde" role="status">{{ aviso }}</p>
+
       <label class="fx-campo filtro">
-        OCS
+        Filtrar por OCS
         <select v-model="filtroOcs" class="fx-entrada">
           <option value="">Todas</option>
-          <option v-for="o in ocs" :key="o.cnpj" :value="o.cnpj">{{ o.nomeFantasia }}</option>
+          <option v-for="o in ocs" :key="o.cnpj" :value="o.cnpj">{{ o.nome }}</option>
         </select>
       </label>
 
-      <p v-if="aviso" class="fx-alerta fx-alerta-verde" role="status">{{ aviso }}</p>
       <p v-if="carregando" class="fx-alerta fx-alerta-cinza">Carregando contratos...</p>
       <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
 
@@ -91,48 +128,33 @@ onMounted(carregar)
         <table class="fx-tabela">
           <thead>
             <tr>
-              <th>Contrato</th>
               <th>OCS</th>
               <th>Procedimento</th>
               <th>Valor</th>
-              <th>Vigência</th>
-              <th><span class="fx-suave">Ação</span></th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="c in contratosFiltrados" :key="c.id">
-              <td class="fx-mono">{{ c.numero }}</td>
               <td>{{ c.ocsNome }}</td>
               <td>{{ c.procedimentoNome }}</td>
               <td class="fx-mono">{{ formatarMoeda(c.valor) }}</td>
-              <td>
-                {{ formatarData(c.inicioVigencia) }} a {{ formatarData(c.fimVigencia) }}
-                <span class="fx-selo" :class="situacao(c).classe">{{ situacao(c).texto }}</span>
-              </td>
-              <td>
-                <button type="button" class="fx-botao-secundario" @click="abrirFormulario(c)">Editar</button>
-              </td>
             </tr>
             <tr v-if="contratosFiltrados.length === 0">
-              <td colspan="6" class="fx-suave">Nenhum contrato encontrado.</td>
+              <td colspan="3" class="fx-suave">Nenhum contrato encontrado.</td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
-
-    <ContratoFormulario
-      v-if="formularioAberto"
-      :contrato="contratoEditado"
-      :ocs="ocs"
-      :procedimentos="procedimentos"
-      @fechar="formularioAberto = false"
-      @salvo="aoSalvar"
-    />
   </main>
 </template>
 
 <style scoped>
+.campo-valor {
+  flex: 0 1 160px;
+  min-width: 140px;
+}
+
 .filtro {
   max-width: 320px;
 }
