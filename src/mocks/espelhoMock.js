@@ -1,5 +1,6 @@
 // Espelho = os atendimentos realizados de uma OCS num período (cada item é um atendimento, com o valor
 // que a OCS cobra). O auditor recebe cada item com o valor do contrato para comparar (US002).
+// Reprovado, ele volta para a OCS corrigir e reenviar o mesmo espelho (sem criar outro).
 import { banco, persistir, proximoId, copiar, registrarHistorico } from './bancoMock.js'
 import { erroHttp, esperar } from './auxiliares.js'
 import { atendimentos } from './checkMutuoMock.js'
@@ -17,7 +18,11 @@ function resumo(espelho) {
     dataAtualizacao: espelho.dataAtualizacao,
     quantidadeItens: itens.length,
     valorTotal: itens.reduce((total, i) => total + i.valor, 0),
-    motivoReprovacao: espelho.motivoReprovacao
+    motivoReprovacao: espelho.motivoReprovacao,
+    // Quantas vezes o auditor já devolveu: sai do historico_status, sem coluna nova.
+    devolucoes: db.historico.filter(
+      h => h.entidadeTipo === 'ESPELHO' && h.entidadeId === espelho.id && h.statusNovo === 'REPROVADO'
+    ).length
   }
 }
 
@@ -98,6 +103,9 @@ export async function mockCriarEspelho({ ocsId, dataInicio, dataFim, itens }) {
 
   const espelho = {
     id: proximoId(db.espelhos),
+    // Espelho.Atendimento_ID (NOT NULL e UNIQUE no banco) fica com o primeiro atendimento;
+    // a lista completa está em Espelho_Item.Atendimento_ID.
+    atendimentoId: novos[0].atendimento.atendimentoId,
     ocsId,
     dataInicio,
     dataFim,
@@ -128,6 +136,7 @@ function decidir(id, statusNovo, motivo, origem) {
     throw erroHttp(409, { codigo: 'ESPELHO_JA_AUDITADO', mensagem: 'Este espelho já foi auditado.' })
   }
   espelho.status = statusNovo
+  // Aprovado limpa o motivo; reenviado mantém o último motivo para o auditor conferir a correção.
   espelho.motivoReprovacao = motivo
   espelho.dataAtualizacao = new Date().toISOString()
   registrarHistorico('ESPELHO', espelho.id, 'EM_ABERTO', statusNovo, origem)
@@ -146,6 +155,63 @@ export async function mockReprovarEspelho(id, motivo) {
     throw erroHttp(400, { codigo: 'MOTIVO_OBRIGATORIO', mensagem: 'O motivo da reprovação é obrigatório.' })
   }
   return decidir(id, 'REPROVADO', motivo.trim(), 'auditoria')
+}
+
+// ---------- Correção pela OCS de um espelho reprovado ----------
+
+function espelhoParaCorrigir(id) {
+  const espelho = encontrar(id)
+  if (espelho.status !== 'REPROVADO') {
+    throw erroHttp(409, { codigo: 'ESPELHO_NAO_REPROVADO', mensagem: 'Só dá para corrigir um espelho reprovado pelo auditor.' })
+  }
+  return espelho
+}
+
+function itemDo(espelho, itemId) {
+  const item = banco().espelhoItens.find(i => i.id === Number(itemId) && i.espelhoId === espelho.id)
+  if (!item) {
+    throw erroHttp(404, { codigo: 'ITEM_NAO_ENCONTRADO', mensagem: 'Item não encontrado neste espelho.' })
+  }
+  return item
+}
+
+// PATCH /espelhos/{id}/itens/{itemId} (US001-5): a OCS corrige o valor cobrado.
+export async function mockCorrigirItemEspelho(id, itemId, { valor }) {
+  await esperar(250)
+  const espelho = espelhoParaCorrigir(id)
+  if (!(Number(valor) > 0)) {
+    throw erroHttp(400, { codigo: 'VALOR_INVALIDO', mensagem: 'O valor precisa ser maior que zero.' })
+  }
+  itemDo(espelho, itemId).valor = Number(valor)
+  espelho.dataAtualizacao = new Date().toISOString()
+  persistir()
+}
+
+// DELETE /espelhos/{id}/itens/{itemId} (US001-5): a OCS tira um atendimento do espelho.
+export async function mockRemoverItemEspelho(id, itemId) {
+  await esperar(250)
+  const espelho = espelhoParaCorrigir(id)
+  const item = itemDo(espelho, itemId)
+  const db = banco()
+  const restantes = db.espelhoItens.filter(i => i.espelhoId === espelho.id && i.id !== item.id)
+  if (restantes.length === 0) {
+    throw erroHttp(422, { codigo: 'ESPELHO_SEM_ITENS', mensagem: 'O espelho precisa ter pelo menos um atendimento.' })
+  }
+  db.espelhoItens = db.espelhoItens.filter(i => i.id !== item.id)
+  if (espelho.atendimentoId === item.atendimentoId) espelho.atendimentoId = restantes[0].atendimentoId
+  espelho.dataAtualizacao = new Date().toISOString()
+  persistir()
+}
+
+// POST /espelhos/{id}/reenviar: volta para a auditoria marcado como devolução corrigida.
+export async function mockReenviarEspelho(id) {
+  await esperar(400)
+  const espelho = espelhoParaCorrigir(id)
+  espelho.status = 'EM_ABERTO'
+  espelho.dataAtualizacao = new Date().toISOString()
+  registrarHistorico('ESPELHO', espelho.id, 'REPROVADO', 'EM_ABERTO', 'reenvio-pela-ocs')
+  persistir()
+  return resumo(espelho)
 }
 
 // GET /guias/{id}/historico (o id é do Guia_Proc = atendimento) e GET /espelhos/{id}/historico.

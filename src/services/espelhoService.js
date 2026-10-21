@@ -5,6 +5,9 @@ import {
   mockCriarEspelho,
   mockAprovarEspelho,
   mockReprovarEspelho,
+  mockCorrigirItemEspelho,
+  mockRemoverItemEspelho,
+  mockReenviarEspelho,
   mockHistorico
 } from '../mocks/espelhoMock.js'
 import { traduzirErro } from '../utils/erros.js'
@@ -59,6 +62,36 @@ export async function reprovarEspelho(id, motivo) {
     return response.data
   } catch (erro) {
     throw traduzirErro(erro, { 400: 'O motivo da reprovação é obrigatório.' })
+  }
+}
+
+// ---------- OCS corrige um espelho reprovado e reenvia ----------
+
+export async function corrigirItemEspelho(id, itemId, valor) {
+  try {
+    if (USAR_MOCK) return await mockCorrigirItemEspelho(id, itemId, { valor })
+    await api.patch(`/espelhos/${id}/itens/${itemId}`, { valor })
+  } catch (erro) {
+    throw traduzirErro(erro, { 409: 'Só dá para corrigir um espelho reprovado.' })
+  }
+}
+
+export async function removerItemEspelho(id, itemId) {
+  try {
+    if (USAR_MOCK) return await mockRemoverItemEspelho(id, itemId)
+    await api.delete(`/espelhos/${id}/itens/${itemId}`)
+  } catch (erro) {
+    throw traduzirErro(erro, { 422: 'O espelho precisa ter pelo menos um atendimento.' })
+  }
+}
+
+export async function reenviarEspelho(id) {
+  try {
+    if (USAR_MOCK) return await mockReenviarEspelho(id)
+    const response = await api.post(`/espelhos/${id}/reenviar`)
+    return response.data
+  } catch (erro) {
+    throw traduzirErro(erro, { 409: 'Só dá para reenviar um espelho reprovado.' })
   }
 }
 

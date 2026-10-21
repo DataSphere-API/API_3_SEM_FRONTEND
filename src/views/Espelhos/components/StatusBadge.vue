@@ -13,7 +13,7 @@ const labels = {
   regerada: 'Regerada',
   em_aberto: 'Em auditoria',
   aprovado: 'Aprovado',
-  reprovado: 'Reprovado',
+  reprovado: 'Reprovado · corrigir',
   faturado: 'Faturado',
   cancelado: 'Cancelado'
 }

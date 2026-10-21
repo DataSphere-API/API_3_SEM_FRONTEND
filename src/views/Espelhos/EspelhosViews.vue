@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { listarEspelhos, listarItensEspelho } from '../../services/espelhoService.js'
 import { sessao } from '../../stores/sessao.js'
 import EspelhosList from './components/EspelhosList.vue'
@@ -8,6 +9,10 @@ import EspelhoDetalhes from './components/EspelhoDetalhes.vue'
 const modalAberto = ref(false)
 const espelhoSelecionado = ref(null)
 const espelhos = ref([])
+const route = useRoute()
+
+// Reprovados pelo auditor: a OCS corrige e reenvia.
+const reprovados = computed(() => espelhos.value.filter(e => e.status === 'reprovado'))
 
 async function carregarEspelhos() {
   try {
@@ -84,6 +89,20 @@ onMounted(() => {
         </div>
       </div>
 
+      <p v-if="route.query.reenviado" class="fx-alerta fx-alerta-verde aviso" role="status">
+        Espelho #{{ route.query.reenviado }} corrigido e reenviado para a auditoria.
+      </p>
+
+      <section v-if="reprovados.length" class="fx-cartao aviso">
+        <strong>Espelhos reprovados pelo auditor</strong>
+        <div v-for="e in reprovados" :key="e.id" class="reprovado">
+          <span>
+            <span class="fx-mono">#{{ e.id }}</span> · {{ e.motivoReprovacao }}
+          </span>
+          <router-link :to="`/espelhos/${e.id}/corrigir`" class="fx-botao link-corrigir">Corrigir e reenviar</router-link>
+        </div>
+      </section>
+
       <div class="section-card">
         <EspelhosList
           :espelhos="espelhos"
@@ -102,6 +121,26 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.aviso {
+  margin-bottom: 1.25rem;
+}
+
+.reprovado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--fx-borda);
+}
+
+.link-corrigir {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 .espelhos-page {
   min-height: 100vh;
   padding: 2.5rem 1.5rem;
