@@ -15,6 +15,8 @@ import AprovacaoView from '../views/Aprovacao/AprovacaoView.vue'
 import SolicitacaoView from '../views/Emissao/SolicitacaoView.vue'
 import AcompanhamentoView from '../views/Emissao/AcompanhamentoView.vue'
 import AprovadasView from '../views/Emissao/AprovadasView.vue'
+import AtendimentosOcsView from '../views/Atendimentos/AtendimentosOcsView.vue'
+import ConfirmarAtendimentoView from '../views/Guias/ConfirmarAtendimentoView.vue'
 import { sessao } from '../stores/sessao.js'
 import { PERFIS } from '../utils/perfis.js'
 
@@ -34,7 +36,7 @@ const routes = [
   { path: '/espelhos/novo', name: 'espelhos-novo', component: CriarEspelhoView, meta: { perfis: ['OCS'] } },
   { path: '/faturas', name: 'faturas', component: FaturasViews, meta: { perfis: ['AUDITOR'] } },
   { path: '/minhas-guias', name: 'minhas-guias', component: MinhasGuiasView, meta: { perfis: ['BENEFICIARIO'] } },
-  { path: '/atendimento', name: 'atendimento', component: AtendimentoView, meta: { perfis: ['OCS'] } },
+  { path: '/ocs/atendimento-qr', name: 'atendimento', component: AtendimentoView, meta: { perfis: ['OCS'] } },
   { path: '/chefe/pre-guias', name: 'pre-guias', component: PreGuiasView, meta: { perfis: ['CHEFE'] } },
 
   { path: '/chefe/aprovacao', name: 'aprovacao-chefe', component: AprovacaoView, meta: { perfis: ['CHEFE'] } },
@@ -47,6 +49,8 @@ const routes = [
   { path: '/emissor/pre-guias/:id/editar', name: 'editar-pre-guia', component: SolicitacaoView, meta: { perfis: ['EMISSOR'] } },
   { path: '/emissor/acompanhamento', name: 'acompanhamento', component: AcompanhamentoView, meta: { perfis: ['EMISSOR'] } },
   { path: '/emissor/aprovadas', name: 'aprovadas', component: AprovadasView, meta: { perfis: ['EMISSOR'] } },
+  { path: '/ocs/atendimentos', name: 'atendimentos-ocs', component: AtendimentosOcsView, meta: { perfis: ['OCS'] } },
+  { path: '/beneficiario/confirmar-atendimento', name: 'confirmar-atendimento', component: ConfirmarAtendimentoView, meta: { perfis: ['BENEFICIARIO'] } },
 
   { path: '/:caminho(.*)*', redirect: rotaInicial }
 ]

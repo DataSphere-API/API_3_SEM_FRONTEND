@@ -32,8 +32,9 @@ export const PERFIS = {
   BENEFICIARIO: {
     rotulo: 'Beneficiário',
     descricao: 'Confirmar os atendimentos e acompanhar suas guias.',
-    rotaInicial: '/minhas-guias',
+    rotaInicial: '/beneficiario/confirmar-atendimento',
     menu: [
+      { rotulo: 'Confirmar atendimento', rota: '/beneficiario/confirmar-atendimento' },
       { rotulo: 'Minhas guias', rota: '/minhas-guias' }
     ]
   },
@@ -48,8 +49,9 @@ export const PERFIS = {
   OCS: {
     rotulo: 'OCS',
     descricao: 'Dar baixa nos atendimentos e enviar espelhos.',
-    rotaInicial: '/espelhos',
+    rotaInicial: '/ocs/atendimentos',
     menu: [
+      { rotulo: 'Atendimentos', rota: '/ocs/atendimentos' },
       { rotulo: 'Espelhos', rota: '/espelhos' }
     ]
   }
