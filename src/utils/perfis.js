@@ -19,8 +19,10 @@ export const PERFIS = {
   EMISSOR: {
     rotulo: 'Emissor',
     descricao: 'Criar pré-guias, corrigir as devolvidas e emitir as aprovadas.',
-    rotaInicial: '/escolher-perfil',
-    menu: []
+    rotaInicial: '/emissor/acompanhamento',
+    menu: [
+      { rotulo: 'Acompanhamento', rota: '/emissor/acompanhamento' }
+    ]
   },
   BENEFICIARIO: {
     rotulo: 'Beneficiário',
