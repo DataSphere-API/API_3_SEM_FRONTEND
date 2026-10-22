@@ -1,10 +1,13 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import GuiasLista from './components/GuiasLista.vue'
 import GuiaDetalhe from './components/GuiaDetalhe.vue'
 import { listarGuias } from '../../services/guiasService.js'
+import { sessao } from '../../stores/sessao.js'
 
-const precCp = ref('')
+// O beneficiário logado já tem Prec-CP: a busca manual só aparece sem ele.
+const precCpDoLogin = sessao.usuario?.precCp || ''
+const precCp = ref(precCpDoLogin)
 const guias = ref([])
 const carregando = ref(false)
 const erro = ref('')
@@ -45,6 +48,10 @@ async function buscar() {
     }
   }
 }
+
+onMounted(() => {
+  if (precCpDoLogin) buscar()
+})
 </script>
 
 <template>
@@ -57,14 +64,14 @@ async function buscar() {
         </p>
       </header>
 
-      <form class="fx-cartao busca" @submit.prevent="buscar">
+      <form v-if="!precCpDoLogin" class="fx-cartao busca" @submit.prevent="buscar">
         <label class="fx-campo">
           PrecCP do beneficiário
           <input
             v-model="precCp"
             type="text"
             class="fx-entrada"
-            placeholder="Ex.: 1001"
+            placeholder="Ex.: 100100100-00"
             autocomplete="off"
           />
         </label>

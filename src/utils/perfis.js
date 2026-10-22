@@ -35,7 +35,7 @@ export const PERFIS = {
     rotaInicial: '/beneficiario/confirmar-atendimento',
     menu: [
       { rotulo: 'Confirmar atendimento', rota: '/beneficiario/confirmar-atendimento' },
-      { rotulo: 'Minhas guias', rota: '/minhas-guias' }
+      { rotulo: 'Minhas guias', rota: '/beneficiario/minhas-guias' }
     ]
   },
   AUDITOR: {
