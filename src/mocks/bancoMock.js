@@ -1,0 +1,265 @@
+// Banco em memória dos mocks, no formato das tabelas e issues do back.
+// Fica salvo no localStorage para o fluxo continuar entre abas e logins de perfis diferentes.
+const CHAVE = 'fusex-banco-mock-v7'
+const SENHA_PADRAO = 'fusex123'
+
+const IMAGEM_CENTRO = '12345678000199'
+const LAB_VIDA = '23456789000188'
+const MOVIMENTO = '34567890000177'
+
+function preGuia(id, dados) {
+  return {
+    id,
+    status: 'PRE_GUIA',
+    medicoId: 2,
+    dataCriacao: `2026-10-${String(5 + id).padStart(2, '0')}`,
+    pendencias: [],
+    dataAprovacaoMedico: null,
+    dataAprovacaoChefe: null,
+    chefeId: null,
+    motivoReprovacao: null,
+    dataEmissao: null,
+    ...dados
+  }
+}
+
+function semente() {
+  return {
+    ocs: [
+      { cnpj: IMAGEM_CENTRO, nome: 'Clínica Imagem Centro' },
+      { cnpj: LAB_VIDA, nome: 'Laboratório Vida' },
+      { cnpj: MOVIMENTO, nome: 'Clínica Movimento' }
+    ],
+    procedimentos: [
+      { id: 1, nome: 'TC Abdome Superior' },
+      { id: 2, nome: 'Hemograma completo' },
+      { id: 3, nome: 'Ultrassom · abdome total' },
+      { id: 4, nome: 'Sessão de psicoterapia' },
+      { id: 5, nome: 'Raio-X · joelho' },
+      { id: 6, nome: 'Eletroneuromiografia' }
+    ],
+    contratos: [
+      { id: 1, procedimentoId: 1, ocsCnpj: IMAGEM_CENTRO, valor: 720.49 },
+      { id: 2, procedimentoId: 3, ocsCnpj: IMAGEM_CENTRO, valor: 280.0 },
+      { id: 3, procedimentoId: 5, ocsCnpj: IMAGEM_CENTRO, valor: 90.0 },
+      { id: 4, procedimentoId: 2, ocsCnpj: LAB_VIDA, valor: 40.0 },
+      { id: 5, procedimentoId: 4, ocsCnpj: MOVIMENTO, valor: 150.0 },
+      { id: 6, procedimentoId: 6, ocsCnpj: MOVIMENTO, valor: 410.0 }
+    ],
+    // Tabela Beneficiario: o autocadastro só aceita quem está aqui.
+    beneficiarios: [
+      { precCp: '100100100-00', nome: 'Fulano de Tal', dataNascimento: '1986-03-10', dependente: false, ug: '3º BD' },
+      { precCp: '123456789-00', nome: 'Ana Paula Souza', dataNascimento: '1990-07-21', dependente: false, ug: '3º BD' },
+      { precCp: '100100100-01', nome: 'João Pedro Lima', dataNascimento: '2001-01-15', dependente: true, ug: '3º BD' },
+      { precCp: '200200200-00', nome: 'Rafael Duarte', dataNascimento: '1980-05-02', dependente: false, ug: '3º BD' },
+      { precCp: '300300300-00', nome: 'Carlos Albuquerque', dataNascimento: '1975-11-30', dependente: false, ug: '3º BD' },
+      { precCp: '400400400-00', nome: 'Luiz Fernandes', dataNascimento: '1992-09-14', dependente: false, ug: '3º BD' },
+      { precCp: '500500500-00', nome: 'Marina Costa', dataNascimento: '1988-02-25', dependente: false, ug: '3º BD' },
+      { precCp: '600600600-00', nome: 'Beatriz Nogueira', dataNascimento: '1995-12-01', dependente: false, ug: '3º BD' }
+    ],
+    // Usuario (Login = CPF) + o perfil que sai de Chefe_Fusex/Medico/Analista/Auditor/FunOcs/Beneficiario.
+    // Militar da equipe é ligado ao Usuario pelo Beneficiario, então também é BENEFICIARIO.
+    usuarios: [
+      { id: 1, cpf: '52601815906', senha: SENHA_PADRAO, perfis: ['CHEFE', 'BENEFICIARIO'], precCp: '300300300-00', crm: '', ocsCnpj: '', cargo: '' },
+      { id: 2, cpf: '08301661305', senha: SENHA_PADRAO, perfis: ['MEDICO', 'BENEFICIARIO'], precCp: '200200200-00', crm: '123456', ocsCnpj: '', cargo: '' },
+      { id: 3, cpf: '18609139034', senha: SENHA_PADRAO, perfis: ['EMISSOR', 'BENEFICIARIO'], precCp: '400400400-00', crm: '', ocsCnpj: '', cargo: '' },
+      { id: 4, cpf: '99603082430', senha: SENHA_PADRAO, perfis: ['AUDITOR', 'BENEFICIARIO'], precCp: '500500500-00', crm: '', ocsCnpj: '', cargo: '' },
+      { id: 5, cpf: '62819482112', senha: SENHA_PADRAO, perfis: ['OCS'], precCp: '', crm: '', ocsCnpj: IMAGEM_CENTRO, cargo: 'Recepção' },
+      { id: 6, cpf: '99351819019', senha: SENHA_PADRAO, perfis: ['BENEFICIARIO'], precCp: '100100100-00', crm: '', ocsCnpj: '', cargo: '' }
+    ],
+    // Guia com status de pré-guia (US005/US006). Cada procedimento é um Guia_Proc (atendimentoId).
+    preGuias: [
+      preGuia(1, {
+        beneficiarioPrecCp: '100100100-00',
+        procedimentos: [{ atendimentoId: 101, procedimentoId: 1, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }]
+      }),
+      preGuia(2, {
+        status: 'COM_PENDENCIAS',
+        beneficiarioPrecCp: '100100100-01',
+        procedimentos: [{ atendimentoId: 102, procedimentoId: 6, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }],
+        pendencias: [{
+          codigo: 'PROCEDIMENTO_SEM_CONTRATO',
+          atendimentoId: 102,
+          mensagem: 'Eletroneuromiografia não possui contrato com a OCS Clínica Imagem Centro'
+        }]
+      }),
+      preGuia(3, {
+        status: 'VALIDADA',
+        beneficiarioPrecCp: '123456789-00',
+        procedimentos: [{ atendimentoId: 103, procedimentoId: 3, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }]
+      }),
+      preGuia(4, {
+        status: 'VALIDADA',
+        beneficiarioPrecCp: '100100100-01',
+        procedimentos: [{ atendimentoId: 104, procedimentoId: 4, ocsCnpj: MOVIMENTO, quantidade: 10 }],
+        dataAprovacaoMedico: '2026-10-09T10:00:00'
+      }),
+      preGuia(5, {
+        status: 'APROVADA',
+        beneficiarioPrecCp: '100100100-00',
+        procedimentos: [{ atendimentoId: 105, procedimentoId: 2, ocsCnpj: LAB_VIDA, quantidade: 1 }],
+        dataAprovacaoMedico: '2026-10-10T09:00:00',
+        dataAprovacaoChefe: '2026-10-10T11:00:00',
+        chefeId: 1
+      }),
+      preGuia(6, {
+        status: 'EMITIDA',
+        beneficiarioPrecCp: '100100100-00',
+        procedimentos: [
+          { atendimentoId: 501, procedimentoId: 5, ocsCnpj: IMAGEM_CENTRO, quantidade: 3 },
+          { atendimentoId: 502, procedimentoId: 1, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }
+        ],
+        dataAprovacaoMedico: '2026-10-12T09:00:00',
+        dataAprovacaoChefe: '2026-10-12T10:00:00',
+        chefeId: 1,
+        dataEmissao: '2026-10-16'
+      }),
+      preGuia(7, {
+        status: 'EMITIDA',
+        beneficiarioPrecCp: '100100100-00',
+        procedimentos: [
+          { atendimentoId: 601, procedimentoId: 3, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 },
+          { atendimentoId: 602, procedimentoId: 5, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }
+        ],
+        dataAprovacaoMedico: '2026-10-08T09:00:00',
+        dataAprovacaoChefe: '2026-10-08T10:00:00',
+        chefeId: 1,
+        dataEmissao: '2026-10-09'
+      }),
+      preGuia(8, {
+        status: 'REPROVADA',
+        beneficiarioPrecCp: '123456789-00',
+        procedimentos: [{ atendimentoId: 106, procedimentoId: 5, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }],
+        motivoReprovacao: 'Procedimento sem indicação clínica no pedido.'
+      }),
+      preGuia(9, {
+        status: 'EMITIDA',
+        beneficiarioPrecCp: '123456789-00',
+        dataCriacao: '2026-08-28',
+        procedimentos: [
+          { atendimentoId: 701, procedimentoId: 3, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 },
+          { atendimentoId: 702, procedimentoId: 1, ocsCnpj: IMAGEM_CENTRO, quantidade: 1 }
+        ],
+        dataAprovacaoMedico: '2026-08-30T09:00:00',
+        dataAprovacaoChefe: '2026-08-30T10:00:00',
+        chefeId: 1,
+        dataEmissao: '2026-09-02'
+      })
+    ],
+    // Sessao_Procedimento: só sessões já confirmadas pelo beneficiário (check mútuo).
+    // O pedido da OCS que ainda espera o beneficiário fica no status do Guia_Proc (aguardandoConfirmacao).
+    sessoes: [
+      { id: 1, atendimentoId: 501, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-17T10:04:00' },
+      { id: 2, atendimentoId: 601, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-11T08:41:00' },
+      { id: 3, atendimentoId: 602, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-10-12T15:20:00' },
+      { id: 4, atendimentoId: 701, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-09-10T09:30:00' },
+      { id: 5, atendimentoId: 702, numeroSessao: 1, ocsCnpj: IMAGEM_CENTRO, dataRealizacao: '2026-09-18T14:00:00' }
+    ],
+    // Espelho = todos os atendimentos realizados de uma OCS num período; cada item é um atendimento.
+    espelhos: [
+      { id: 1, atendimentoId: 601, ocsId: IMAGEM_CENTRO, dataInicio: '2026-10-01', dataFim: '2026-10-15', status: 'EM_ABERTO', dataAtualizacao: null, motivoReprovacao: null },
+      { id: 2, atendimentoId: 701, ocsId: IMAGEM_CENTRO, dataInicio: '2026-09-01', dataFim: '2026-09-30', status: 'APROVADO', dataAtualizacao: '2026-10-02T11:00:00', motivoReprovacao: null }
+    ],
+    espelhoItens: [
+      { id: 1, espelhoId: 1, atendimentoId: 601, beneficiarioId: '100100100-00', descricao: 'Ultrassom · abdome total', valor: 310.0 },
+      { id: 2, espelhoId: 1, atendimentoId: 602, beneficiarioId: '100100100-00', descricao: 'Raio-X · joelho', valor: 90.0 },
+      { id: 3, espelhoId: 2, atendimentoId: 701, beneficiarioId: '123456789-00', descricao: 'Ultrassom · abdome total', valor: 280.0 },
+      { id: 4, espelhoId: 2, atendimentoId: 702, beneficiarioId: '123456789-00', descricao: 'TC Abdome Superior', valor: 750.0 }
+    ],
+    // Fatura mensal por OCS: junta os itens dos espelhos aprovados do mês (Item_Fatura → Espelho_Item).
+    // Fatura.Esp_Fat e Guia_Proc_ID (NOT NULL no banco) ficam com o primeiro espelho/atendimento.
+    faturas: [
+      { id: 1, ocsId: IMAGEM_CENTRO, competencia: '2026-09', espelhoId: 2, guiaProcId: 701, status: 'ATIVA', dataGeracao: '2026-10-02T11:00:00', dataEncaminhamento: null }
+    ],
+    itensFatura: [
+      { id: 1, faturaId: 1, espelhoItemId: 3, valorApresentado: 280.0, valorContratado: 280.0, divergenciaValor: 0 },
+      { id: 2, faturaId: 1, espelhoItemId: 4, valorApresentado: 750.0, valorContratado: 720.49, divergenciaValor: 29.51 }
+    ],
+    // historico_status (US001-3): GUIA_PROC usa o atendimentoId.
+    historico: [
+      { id: 1, entidadeTipo: 'GUIA_PROC', entidadeId: 501, statusAnterior: null, statusNovo: 'PENDENTE', data: '2026-10-16T09:00:00', origem: 'emissao-da-guia' },
+      { id: 2, entidadeTipo: 'GUIA_PROC', entidadeId: 502, statusAnterior: null, statusNovo: 'PENDENTE', data: '2026-10-16T09:00:00', origem: 'emissao-da-guia' },
+      { id: 3, entidadeTipo: 'GUIA_PROC', entidadeId: 501, statusAnterior: 'PENDENTE', statusNovo: 'EM_ANDAMENTO', data: '2026-10-17T10:04:00', origem: 'confirmacao-do-beneficiario' },
+      { id: 4, entidadeTipo: 'GUIA_PROC', entidadeId: 601, statusAnterior: null, statusNovo: 'PENDENTE', data: '2026-10-09T09:00:00', origem: 'emissao-da-guia' },
+      { id: 5, entidadeTipo: 'GUIA_PROC', entidadeId: 601, statusAnterior: 'PENDENTE', statusNovo: 'REALIZADA', data: '2026-10-11T08:41:00', origem: 'confirmacao-do-beneficiario' },
+      { id: 6, entidadeTipo: 'GUIA_PROC', entidadeId: 602, statusAnterior: null, statusNovo: 'PENDENTE', data: '2026-10-09T09:00:00', origem: 'emissao-da-guia' },
+      { id: 7, entidadeTipo: 'GUIA_PROC', entidadeId: 602, statusAnterior: 'PENDENTE', statusNovo: 'REALIZADA', data: '2026-10-12T15:20:00', origem: 'confirmacao-do-beneficiario' },
+      { id: 8, entidadeTipo: 'ESPELHO', entidadeId: 1, statusAnterior: null, statusNovo: 'EM_ABERTO', data: '2026-10-16T14:00:00', origem: 'envio-pela-ocs' },
+      { id: 9, entidadeTipo: 'ESPELHO', entidadeId: 2, statusAnterior: null, statusNovo: 'EM_ABERTO', data: '2026-09-30T17:00:00', origem: 'envio-pela-ocs' },
+      { id: 10, entidadeTipo: 'ESPELHO', entidadeId: 2, statusAnterior: 'EM_ABERTO', statusNovo: 'APROVADO', data: '2026-10-02T11:00:00', origem: 'auditoria' },
+      { id: 11, entidadeTipo: 'FATURA', entidadeId: 1, statusAnterior: null, statusNovo: 'ATIVA', data: '2026-10-02T11:00:00', origem: 'aprovacao-do-espelho' }
+    ]
+  }
+}
+
+let estado = null
+
+// Outra aba gravou no banco mock: descarta a cópia em memória para ler de novo.
+window.addEventListener('storage', evento => {
+  if (evento.key === CHAVE) estado = null
+})
+
+export function banco() {
+  if (!estado) {
+    try {
+      estado = JSON.parse(localStorage.getItem(CHAVE)) || semente()
+    } catch {
+      estado = semente()
+    }
+  }
+  return estado
+}
+
+export function persistir() {
+  try {
+    localStorage.setItem(CHAVE, JSON.stringify(estado))
+  } catch {
+    // sem storage os dados mock valem só até recarregar
+  }
+}
+
+export function resetarBancoMock() {
+  estado = semente()
+  persistir()
+}
+
+export function proximoId(lista) {
+  return lista.reduce((maior, item) => Math.max(maior, item.id), 0) + 1
+}
+
+export function copiar(valor) {
+  return JSON.parse(JSON.stringify(valor))
+}
+
+export function registrarHistorico(entidadeTipo, entidadeId, statusAnterior, statusNovo, origem) {
+  const db = banco()
+  db.historico.push({
+    id: proximoId(db.historico),
+    entidadeTipo,
+    entidadeId,
+    statusAnterior,
+    statusNovo,
+    data: new Date().toISOString(),
+    origem
+  })
+}
+
+// Valor do contrato do procedimento do atendimento com a OCS (Guia_Proc → Contrato, US001-2).
+export function valorContratadoDoAtendimento(atendimentoId) {
+  const db = banco()
+  const procedimento = db.preGuias.flatMap(p => p.procedimentos).find(p => p.atendimentoId === atendimentoId)
+  if (!procedimento) return null
+  const contrato = db.contratos.find(
+    c => c.procedimentoId === procedimento.procedimentoId && c.ocsCnpj === procedimento.ocsCnpj
+  )
+  return contrato ? contrato.valor : null
+}
+
+// Nome exibido de um usuário: o do beneficiário vinculado, ou o cargo na OCS.
+export function nomeDoUsuario(usuario) {
+  const db = banco()
+  const beneficiario = db.beneficiarios.find(b => b.precCp === usuario.precCp)
+  if (beneficiario) return beneficiario.nome
+  const ocs = db.ocs.find(o => o.cnpj === usuario.ocsCnpj)
+  return [usuario.cargo, ocs?.nome].filter(Boolean).join(' · ') || usuario.cpf
+}
