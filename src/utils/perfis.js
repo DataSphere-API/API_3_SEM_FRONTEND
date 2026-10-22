@@ -13,14 +13,17 @@ export const PERFIS = {
   MEDICO: {
     rotulo: 'Médico',
     descricao: 'Criar solicitações de exame e aprovar pré-guias.',
-    rotaInicial: '/escolher-perfil',
-    menu: []
+    rotaInicial: '/medico/nova-solicitacao',
+    menu: [
+      { rotulo: 'Nova solicitação', rota: '/medico/nova-solicitacao' }
+    ]
   },
   EMISSOR: {
     rotulo: 'Emissor',
     descricao: 'Criar pré-guias, corrigir as devolvidas e emitir as aprovadas.',
     rotaInicial: '/emissor/acompanhamento',
     menu: [
+      { rotulo: 'Criar pré-guia', rota: '/emissor/pre-guias/nova' },
       { rotulo: 'Acompanhamento', rota: '/emissor/acompanhamento' }
     ]
   },

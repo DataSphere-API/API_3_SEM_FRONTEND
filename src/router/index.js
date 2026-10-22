@@ -11,6 +11,7 @@ import CadastroBeneficiarioView from '../views/Acesso/CadastroBeneficiarioView.v
 import UsuariosView from '../views/Usuarios/UsuariosView.vue'
 import OcsView from '../views/Ocs/OcsView.vue'
 import ContratosView from '../views/Contratos/ContratosView.vue'
+import SolicitacaoView from '../views/Emissao/SolicitacaoView.vue'
 import AcompanhamentoView from '../views/Emissao/AcompanhamentoView.vue'
 import { sessao } from '../stores/sessao.js'
 import { PERFIS } from '../utils/perfis.js'
@@ -37,6 +38,9 @@ const routes = [
   { path: '/chefe/usuarios', name: 'usuarios', component: UsuariosView, meta: { perfis: ['CHEFE'] } },
   { path: '/chefe/ocs', name: 'ocs', component: OcsView, meta: { perfis: ['CHEFE'] } },
   { path: '/chefe/contratos', name: 'contratos', component: ContratosView, meta: { perfis: ['CHEFE'] } },
+  { path: '/medico/nova-solicitacao', name: 'nova-solicitacao', component: SolicitacaoView, meta: { perfis: ['MEDICO'] } },
+  { path: '/emissor/pre-guias/nova', name: 'criar-pre-guia', component: SolicitacaoView, meta: { perfis: ['EMISSOR'] } },
+  { path: '/emissor/pre-guias/:id/editar', name: 'editar-pre-guia', component: SolicitacaoView, meta: { perfis: ['EMISSOR'] } },
   { path: '/emissor/acompanhamento', name: 'acompanhamento', component: AcompanhamentoView, meta: { perfis: ['EMISSOR'] } },
 
   { path: '/:caminho(.*)*', redirect: rotaInicial }
