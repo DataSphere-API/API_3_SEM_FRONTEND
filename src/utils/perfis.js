@@ -2,9 +2,9 @@ export const PERFIS = {
   CHEFE: {
     rotulo: 'Chefe do FUSEx',
     descricao: 'Aprovar pré-guias e cadastrar usuários, OCS e contratos.',
-    rotaInicial: '/pre-guias',
+    rotaInicial: '/chefe/aprovacao',
     menu: [
-      { rotulo: 'Pré-guias', rota: '/pre-guias' },
+      { rotulo: 'Pré-guias para aprovar', rota: '/chefe/aprovacao' },
       { rotulo: 'Usuários e perfis', rota: '/chefe/usuarios' },
       { rotulo: 'OCS credenciadas', rota: '/chefe/ocs' },
       { rotulo: 'Contratos', rota: '/chefe/contratos' }
@@ -13,9 +13,10 @@ export const PERFIS = {
   MEDICO: {
     rotulo: 'Médico',
     descricao: 'Criar solicitações de exame e aprovar pré-guias.',
-    rotaInicial: '/medico/nova-solicitacao',
+    rotaInicial: '/medico/aprovacao',
     menu: [
-      { rotulo: 'Nova solicitação', rota: '/medico/nova-solicitacao' }
+      { rotulo: 'Nova solicitação', rota: '/medico/nova-solicitacao' },
+      { rotulo: 'Pré-guias para aprovar', rota: '/medico/aprovacao' }
     ]
   },
   EMISSOR: {
@@ -24,7 +25,8 @@ export const PERFIS = {
     rotaInicial: '/emissor/acompanhamento',
     menu: [
       { rotulo: 'Criar pré-guia', rota: '/emissor/pre-guias/nova' },
-      { rotulo: 'Acompanhamento', rota: '/emissor/acompanhamento' }
+      { rotulo: 'Acompanhamento', rota: '/emissor/acompanhamento' },
+      { rotulo: 'Aprovadas', rota: '/emissor/aprovadas' }
     ]
   },
   BENEFICIARIO: {

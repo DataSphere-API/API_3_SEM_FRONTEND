@@ -11,8 +11,10 @@ import CadastroBeneficiarioView from '../views/Acesso/CadastroBeneficiarioView.v
 import UsuariosView from '../views/Usuarios/UsuariosView.vue'
 import OcsView from '../views/Ocs/OcsView.vue'
 import ContratosView from '../views/Contratos/ContratosView.vue'
+import AprovacaoView from '../views/Aprovacao/AprovacaoView.vue'
 import SolicitacaoView from '../views/Emissao/SolicitacaoView.vue'
 import AcompanhamentoView from '../views/Emissao/AcompanhamentoView.vue'
+import AprovadasView from '../views/Emissao/AprovadasView.vue'
 import { sessao } from '../stores/sessao.js'
 import { PERFIS } from '../utils/perfis.js'
 
@@ -33,8 +35,10 @@ const routes = [
   { path: '/faturas', name: 'faturas', component: FaturasViews, meta: { perfis: ['AUDITOR'] } },
   { path: '/minhas-guias', name: 'minhas-guias', component: MinhasGuiasView, meta: { perfis: ['BENEFICIARIO'] } },
   { path: '/atendimento', name: 'atendimento', component: AtendimentoView, meta: { perfis: ['OCS'] } },
-  { path: '/pre-guias', name: 'pre-guias', component: PreGuiasView, meta: { perfis: ['CHEFE'] } },
+  { path: '/chefe/pre-guias', name: 'pre-guias', component: PreGuiasView, meta: { perfis: ['CHEFE'] } },
 
+  { path: '/chefe/aprovacao', name: 'aprovacao-chefe', component: AprovacaoView, meta: { perfis: ['CHEFE'] } },
+  { path: '/medico/aprovacao', name: 'aprovacao-medico', component: AprovacaoView, meta: { perfis: ['MEDICO'] } },
   { path: '/chefe/usuarios', name: 'usuarios', component: UsuariosView, meta: { perfis: ['CHEFE'] } },
   { path: '/chefe/ocs', name: 'ocs', component: OcsView, meta: { perfis: ['CHEFE'] } },
   { path: '/chefe/contratos', name: 'contratos', component: ContratosView, meta: { perfis: ['CHEFE'] } },
@@ -42,6 +46,7 @@ const routes = [
   { path: '/emissor/pre-guias/nova', name: 'criar-pre-guia', component: SolicitacaoView, meta: { perfis: ['EMISSOR'] } },
   { path: '/emissor/pre-guias/:id/editar', name: 'editar-pre-guia', component: SolicitacaoView, meta: { perfis: ['EMISSOR'] } },
   { path: '/emissor/acompanhamento', name: 'acompanhamento', component: AcompanhamentoView, meta: { perfis: ['EMISSOR'] } },
+  { path: '/emissor/aprovadas', name: 'aprovadas', component: AprovadasView, meta: { perfis: ['EMISSOR'] } },
 
   { path: '/:caminho(.*)*', redirect: rotaInicial }
 ]
