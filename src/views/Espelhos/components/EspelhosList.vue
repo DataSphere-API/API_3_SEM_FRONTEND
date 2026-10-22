@@ -54,6 +54,9 @@
 
             <td>
               <StatusBadge :status="espelho.status" />
+              <div v-if="espelho.motivoReprovacao" class="motivo">
+                {{ espelho.motivoReprovacao }}
+              </div>
             </td>
 
             <td>
@@ -113,6 +116,14 @@ const filtros = [
     valor: 'em_aberto'
   },
   {
+    label: 'Aprovados',
+    valor: 'aprovado'
+  },
+  {
+    label: 'Reprovados',
+    valor: 'reprovado'
+  },
+  {
     label: 'Faturados',
     valor: 'faturado'
   },
@@ -149,6 +160,12 @@ function formatarValor(valor) {
 </script>
 
 <style scoped>
+.motivo {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: #a3261b;
+}
+
 .espelhos-container {
   width: 100%;
 }

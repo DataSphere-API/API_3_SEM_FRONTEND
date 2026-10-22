@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import EspelhosViews from '../views/Espelhos/EspelhosViews.vue'
 import CriarEspelhoView from '../views/Espelhos/CriarEspelhoView.vue'
+import CorrigirEspelhoView from '../views/Espelhos/CorrigirEspelhoView.vue'
 import FaturasViews from '../views/Faturas/FaturasViews.vue'
 import MinhasGuiasView from '../views/Guias/MinhasGuiasView.vue'
 import AtendimentoView from '../views/Atendimentos/AtendimentoView.vue'
@@ -17,6 +18,8 @@ import AcompanhamentoView from '../views/Emissao/AcompanhamentoView.vue'
 import AprovadasView from '../views/Emissao/AprovadasView.vue'
 import AtendimentosOcsView from '../views/Atendimentos/AtendimentosOcsView.vue'
 import ConfirmarAtendimentoView from '../views/Guias/ConfirmarAtendimentoView.vue'
+import EspelhosRecebidosView from '../views/Auditoria/EspelhosRecebidosView.vue'
+import HistoricoView from '../views/Auditoria/HistoricoView.vue'
 import { sessao } from '../stores/sessao.js'
 import { PERFIS } from '../utils/perfis.js'
 
@@ -32,8 +35,9 @@ const routes = [
   { path: '/cadastro', name: 'cadastro', component: CadastroBeneficiarioView, meta: { publica: true } },
   { path: '/escolher-perfil', name: 'escolher-perfil', component: EscolherPerfilView },
 
-  { path: '/espelhos', name: 'espelhos', component: EspelhosViews, meta: { perfis: ['OCS'] } },
-  { path: '/espelhos/novo', name: 'espelhos-novo', component: CriarEspelhoView, meta: { perfis: ['OCS'] } },
+  { path: '/ocs/espelhos', name: 'espelhos', component: EspelhosViews, meta: { perfis: ['OCS'] } },
+  { path: '/ocs/espelhos/novo', name: 'espelhos-novo', component: CriarEspelhoView, meta: { perfis: ['OCS'] } },
+  { path: '/ocs/espelhos/:id/corrigir', name: 'corrigir-espelho', component: CorrigirEspelhoView, meta: { perfis: ['OCS'] } },
   { path: '/faturas', name: 'faturas', component: FaturasViews, meta: { perfis: ['AUDITOR'] } },
   { path: '/beneficiario/minhas-guias', name: 'minhas-guias', component: MinhasGuiasView, meta: { perfis: ['BENEFICIARIO'] } },
   { path: '/ocs/atendimento-qr', name: 'atendimento', component: AtendimentoView, meta: { perfis: ['OCS'] } },
@@ -51,6 +55,8 @@ const routes = [
   { path: '/emissor/aprovadas', name: 'aprovadas', component: AprovadasView, meta: { perfis: ['EMISSOR'] } },
   { path: '/ocs/atendimentos', name: 'atendimentos-ocs', component: AtendimentosOcsView, meta: { perfis: ['OCS'] } },
   { path: '/beneficiario/confirmar-atendimento', name: 'confirmar-atendimento', component: ConfirmarAtendimentoView, meta: { perfis: ['BENEFICIARIO'] } },
+  { path: '/auditor/espelhos', name: 'espelhos-recebidos', component: EspelhosRecebidosView, meta: { perfis: ['AUDITOR'] } },
+  { path: '/auditor/historico', name: 'historico', component: HistoricoView, meta: { perfis: ['AUDITOR'] } },
 
   { path: '/:caminho(.*)*', redirect: rotaInicial }
 ]

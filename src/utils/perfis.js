@@ -41,9 +41,11 @@ export const PERFIS = {
   AUDITOR: {
     rotulo: 'Auditor',
     descricao: 'Receber, aprovar ou reprovar espelhos e ver o histórico.',
-    rotaInicial: '/faturas',
+    rotaInicial: '/auditor/espelhos',
     menu: [
-      { rotulo: 'Faturas', rota: '/faturas' }
+      { rotulo: 'Espelhos recebidos', rota: '/auditor/espelhos' },
+      { rotulo: 'Faturas', rota: '/faturas' },
+      { rotulo: 'Histórico', rota: '/auditor/historico' }
     ]
   },
   OCS: {
@@ -52,7 +54,7 @@ export const PERFIS = {
     rotaInicial: '/ocs/atendimentos',
     menu: [
       { rotulo: 'Atendimentos', rota: '/ocs/atendimentos' },
-      { rotulo: 'Espelhos', rota: '/espelhos' }
+      { rotulo: 'Espelhos', rota: '/ocs/espelhos' }
     ]
   }
 }
