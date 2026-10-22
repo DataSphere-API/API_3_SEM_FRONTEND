@@ -44,7 +44,7 @@ export const PERFIS = {
     rotaInicial: '/auditor/espelhos',
     menu: [
       { rotulo: 'Espelhos recebidos', rota: '/auditor/espelhos' },
-      { rotulo: 'Faturas', rota: '/faturas' },
+      { rotulo: 'Faturas mensais', rota: '/auditor/faturas' },
       { rotulo: 'Histórico', rota: '/auditor/historico' }
     ]
   },
