@@ -1,5 +1,5 @@
 import { api } from './http.js'
-import { mockListarFaturas, mockBuscarFatura } from '../mocks/faturaMensalMock.js'
+import { mockListarFaturas, mockBuscarFatura, mockEncaminharFatura } from '../mocks/faturaMensalMock.js'
 import { traduzirErro } from '../utils/erros.js'
 
 const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
@@ -25,3 +25,12 @@ export async function buscarFaturaMensal(id) {
   }
 }
 
+export async function encaminharFaturaMensal(id) {
+  try {
+    if (USAR_MOCK) return await mockEncaminharFatura(id)
+    const response = await api.post(`/faturas/${id}/encaminhar`)
+    return response.data
+  } catch (erro) {
+    throw traduzirErro(erro, { 422: 'A fatura ainda não pode ser encaminhada.' })
+  }
+}
