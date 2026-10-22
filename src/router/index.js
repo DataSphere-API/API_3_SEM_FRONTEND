@@ -38,6 +38,7 @@ const routes = [
   { path: '/ocs/espelhos', name: 'espelhos', component: EspelhosViews, meta: { perfis: ['OCS'] } },
   { path: '/ocs/espelhos/novo', name: 'espelhos-novo', component: CriarEspelhoView, meta: { perfis: ['OCS'] } },
   { path: '/ocs/espelhos/:id/corrigir', name: 'corrigir-espelho', component: CorrigirEspelhoView, meta: { perfis: ['OCS'] } },
+  // Fatura mensal por OCS (substitui a tela antiga de gerar/regerar fatura por espelho).
   { path: '/auditor/faturas', name: 'faturas', component: FaturasMensaisView, meta: { perfis: ['AUDITOR'] } },
   { path: '/beneficiario/minhas-guias', name: 'minhas-guias', component: MinhasGuiasView, meta: { perfis: ['BENEFICIARIO'] } },
   { path: '/ocs/atendimento-qr', name: 'atendimento', component: AtendimentoView, meta: { perfis: ['OCS'] } },
