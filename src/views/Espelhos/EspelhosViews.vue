@@ -1,173 +1,195 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import axios from 'axios'
-import EspelhosList from './components/EspelhosList.vue'
-import EspelhoDetalhes from './components/EspelhoDetalhes.vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { listarEspelhos, listarItensEspelho } from '../../services/espelhoService.js'
+import { sessao } from '../../stores/sessao.js'
+import { formatarMoeda } from '../../utils/avaliarLisura.js'
+import { formatarData } from '../../utils/documentos.js'
+import { competenciaDe, rotuloCompetencia } from '../../utils/competencia.js'
 
-const modalAberto = ref(false)
-const espelhoSelecionado = ref(null)
+const STATUS = {
+  EM_ABERTO: { texto: 'Na auditoria', classe: 'fx-selo-ambar' },
+  APROVADO: { texto: 'Aprovado', classe: 'fx-selo-verde' },
+  REPROVADO: { texto: 'Devolvido', classe: 'fx-selo-vermelho' },
+  FATURADO: { texto: 'Faturado', classe: 'fx-selo-azul' }
+}
+
+const route = useRoute()
 const espelhos = ref([])
+const carregando = ref(false)
+const erro = ref('')
+const aberto = ref(null)
+const itens = ref([])
 
-async function carregarEspelhos() {
+// A OCS vê só os dela, do mais novo para o mais antigo.
+const lista = computed(() => [...espelhos.value].sort((a, b) => b.id - a.id))
+// Reprovados pelo auditor: a OCS corrige e reenvia.
+const reprovados = computed(() => espelhos.value.filter(e => e.status === 'REPROVADO'))
+
+function selo(status) {
+  return STATUS[status] || { texto: status, classe: 'fx-selo-cinza' }
+}
+
+async function carregar() {
+  carregando.value = true
+  erro.value = ''
   try {
-    const response = await axios.get('http://localhost:8080/espelhos')
-
-    espelhos.value = response.data.map(espelho => ({
-      ...espelho,
-      ocs: espelho.ocsNome || espelho.ocsId,
-      data: `${espelho.dataInicio} - ${espelho.dataFim}`,
-      status: espelho.status.toLowerCase()
-    }))
-  } catch (error) {
-    console.error('Erro ao carregar espelhos:', error)
+    espelhos.value = await listarEspelhos({ cnpj: sessao.usuario?.ocsCnpj })
+  } catch (e) {
+    erro.value = e.mensagemUsuario || 'Não foi possível carregar os espelhos.'
+  } finally {
+    carregando.value = false
   }
 }
 
-function visualizarEspelho(espelho) {
-  espelhoSelecionado.value = espelho
-  modalAberto.value = true
-}
-
-function fecharDetalhes() {
-  modalAberto.value = false
-  espelhoSelecionado.value = null
-}
-
-function salvarEspelho(espelhoAtualizado) {
-  const index = espelhos.value.findIndex(
-    espelho => espelho.id === espelhoAtualizado.id
-  )
-
-  if (index === -1) {
-    return
+async function abrir(espelho) {
+  erro.value = ''
+  try {
+    itens.value = await listarItensEspelho(espelho.id)
+    aberto.value = espelho
+  } catch (e) {
+    erro.value = e.mensagemUsuario || 'Não foi possível abrir o espelho.'
   }
-
-  espelhos.value[index] = espelhoAtualizado
-  espelhoSelecionado.value = espelhoAtualizado
 }
 
-onMounted(() => {
-  carregarEspelhos()
-})
+onMounted(carregar)
 </script>
 
 <template>
-  <div class="espelhos-page">
-    <div class="page-content">
-      <div class="page-header">
-        <div class="header-row">
-          <div>
-            <h1>Espelhos</h1>
-            <p>Acompanhe e corrija os espelhos gerados.</p>
-          </div>
-
-          <router-link to="/espelhos/novo" class="new-button">
-            + Novo espelho
-          </router-link>
+  <main class="fx-pagina">
+    <div class="fx-conteudo fx-conteudo-largo">
+      <header class="topo">
+        <div>
+          <h1 class="fx-titulo">Espelhos</h1>
+          <p class="fx-subtitulo">Os espelhos que a clínica enviou para a auditoria do FUSEx.</p>
         </div>
-      </div>
+        <router-link to="/ocs/espelhos/novo" class="fx-botao link-botao">Novo espelho</router-link>
+      </header>
 
-      <div class="section-card">
-        <EspelhosList
-          :espelhos="espelhos"
-          @visualizar="visualizarEspelho"
-        />
-      </div>
+      <p v-if="route.query.reenviado" class="fx-alerta fx-alerta-verde" role="status">
+        Espelho #{{ route.query.reenviado }} corrigido e reenviado para a auditoria.
+      </p>
+
+      <section v-if="reprovados.length && !aberto" class="fx-cartao">
+        <h2 class="fx-secao-titulo">Devolvidos pelo auditor</h2>
+        <div v-for="e in reprovados" :key="e.id" class="reprovado">
+          <span><span class="fx-mono">#{{ e.id }}</span> · {{ e.motivoReprovacao }}</span>
+          <router-link :to="`/ocs/espelhos/${e.id}/corrigir`" class="fx-botao link-botao">Corrigir e reenviar</router-link>
+        </div>
+      </section>
+
+      <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
+
+      <template v-if="!aberto">
+        <p v-if="carregando" class="fx-alerta fx-alerta-cinza">Carregando espelhos...</p>
+        <div v-else class="fx-tabela-rolagem">
+          <table class="fx-tabela">
+            <thead>
+              <tr>
+                <th>Espelho</th>
+                <th>Mês</th>
+                <th>Período</th>
+                <th>Atendimentos</th>
+                <th>Total cobrado</th>
+                <th>Situação</th>
+                <th><span class="fx-suave">Ação</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="e in lista" :key="e.id">
+                <td class="fx-mono">#{{ e.id }}</td>
+                <td>{{ rotuloCompetencia(competenciaDe(e.dataInicio)) }}</td>
+                <td>{{ formatarData(e.dataInicio) }} a {{ formatarData(e.dataFim) }}</td>
+                <td>{{ e.quantidadeItens }}</td>
+                <td class="fx-mono">{{ formatarMoeda(e.valorTotal) }}</td>
+                <td>
+                  <span class="fx-selo" :class="selo(e.status).classe">{{ selo(e.status).texto }}</span>
+                  <span v-if="e.devolucoes && e.status === 'EM_ABERTO'" class="fx-suave"> · reenviado</span>
+                </td>
+                <td><button type="button" class="fx-botao-secundario" @click="abrir(e)">Ver</button></td>
+              </tr>
+              <tr v-if="lista.length === 0">
+                <td colspan="7" class="fx-suave">Nenhum espelho ainda. Use "Novo espelho" para enviar os atendimentos do mês.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+
+      <template v-else>
+        <div>
+          <button type="button" class="fx-botao-secundario" @click="aberto = null">← Voltar para os espelhos</button>
+        </div>
+        <article class="fx-cartao">
+          <div class="topo">
+            <h2 class="titulo-espelho">
+              Espelho <span class="fx-mono">#{{ aberto.id }}</span> · {{ rotuloCompetencia(competenciaDe(aberto.dataInicio)) }}
+            </h2>
+            <span class="fx-selo" :class="selo(aberto.status).classe">{{ selo(aberto.status).texto }}</span>
+          </div>
+          <p class="fx-suave">
+            {{ formatarData(aberto.dataInicio) }} a {{ formatarData(aberto.dataFim) }} · {{ aberto.quantidadeItens }}
+            atendimento(s) · Total <span class="fx-mono">{{ formatarMoeda(aberto.valorTotal) }}</span>
+          </p>
+          <p v-if="aberto.status === 'REPROVADO'" class="fx-alerta fx-alerta-vermelho">
+            Devolvido pelo auditor: {{ aberto.motivoReprovacao }}
+          </p>
+          <div class="fx-tabela-rolagem">
+            <table class="fx-tabela">
+              <thead>
+                <tr>
+                  <th>Atendimento</th>
+                  <th>Procedimento</th>
+                  <th>Beneficiário (Prec-CP)</th>
+                  <th>Valor cobrado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="i in itens" :key="i.id">
+                  <td class="fx-mono">{{ i.atendimentoId }}</td>
+                  <td>{{ i.descricao }}</td>
+                  <td class="fx-mono">{{ i.beneficiarioId }}</td>
+                  <td class="fx-mono">{{ formatarMoeda(i.valor) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="aberto.status === 'REPROVADO'">
+            <router-link :to="`/ocs/espelhos/${aberto.id}/corrigir`" class="fx-botao link-botao">Corrigir e reenviar</router-link>
+          </div>
+        </article>
+      </template>
     </div>
-
-    <EspelhoDetalhes
-      :aberto="modalAberto"
-      :espelho="espelhoSelecionado"
-      @fechar="fecharDetalhes"
-      @salvar="salvarEspelho"
-    />
-  </div>
+  </main>
 </template>
 
 <style scoped>
-.espelhos-page {
-  min-height: 100vh;
-  padding: 2.5rem 1.5rem;
-  background-color: var(--color-background);
-}
-
-.page-content {
-  width: min(1200px, 100%);
-  margin: 0 auto;
-}
-
-.page-header {
-  margin-bottom: 2rem;
-}
-
-.header-row {
+.topo {
   display: flex;
-  align-items: flex-end;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-.page-header h1 {
+.titulo-espelho {
   margin: 0;
-  color: var(--text-color);
-  font-family: "DM Sans", sans-serif;
-  font-size: 1.8rem;
-  font-weight: 700;
+  font-size: 1.15rem;
 }
 
-.page-header p {
-  margin: 0.5rem 0 0;
-  color: var(--text-light-color);
-  font-size: 0.9rem;
+.reprovado {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--fx-borda);
 }
 
-.section-card {
-  padding: 1.5rem;
-  background-color: #ffffff;
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-}
-
-.new-button {
+.link-botao {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 0.7rem 1.2rem;
-  border: 1px solid var(--primary-color);
-  border-radius: 9999px;
-  background-color: var(--primary-color);
-  color: #ffffff;
-  font-family: "Vend Sans", sans-serif;
-  font-size: 0.85rem;
-  font-weight: 600;
   text-decoration: none;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease;
-}
-
-.new-button:hover {
-  background-color: var(--primary-dark-bg-color);
-  border-color: var(--primary-dark-bg-color);
-}
-
-@media (max-width: 768px) {
-  .espelhos-page {
-    padding: 1.5rem 1rem;
-  }
-
-  .header-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .new-button {
-    width: 100%;
-  }
-
-  .section-card {
-    padding: 1rem;
-  }
 }
 </style>
