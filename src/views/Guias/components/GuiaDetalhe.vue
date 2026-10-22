@@ -60,11 +60,14 @@ async function carregarQr(guiaAtual, atendimentoId) {
   }
 }
 
+// Validação por QR Code ficou fora do escopo da sprint (a baixa é pelo check mútuo).
+const QR_NO_ESCOPO = false
+
 function carregarQrs() {
   qrs.value = {}
   ampliado.value = null
 
-  if (!props.aberto || !props.guia) {
+  if (!QR_NO_ESCOPO || !props.aberto || !props.guia) {
     return
   }
 
@@ -80,6 +83,7 @@ function carregarQrs() {
 watch([() => props.aberto, () => props.guia], carregarQrs, { immediate: true })
 
 function situacao(proc) {
+  if (!QR_NO_ESCOPO) return { exibir: false, mensagem: '' }
   return situacaoQr(props.guia, proc)
 }
 
@@ -164,7 +168,7 @@ function baixar(proc) {
             </div>
           </template>
 
-          <p v-else class="fx-alerta fx-alerta-cinza">{{ situacao(proc).mensagem }}</p>
+          <p v-else-if="situacao(proc).mensagem" class="fx-alerta fx-alerta-cinza">{{ situacao(proc).mensagem }}</p>
         </section>
       </div>
 

@@ -1,14 +1,18 @@
 import axios from 'axios'
-import { mockBuscarQrCode, mockListarGuias } from '../mocks/guiasMock.js'
+import { api } from './http.js'
+import { mockBuscarQrCode } from '../mocks/guiasMock.js'
+import { mockListarGuiasDoBeneficiario } from '../mocks/checkMutuoMock.js'
 import { erroDeFormato, traduzirErro } from '../utils/erros.js'
 
 const USAR_MOCK = (import.meta.env.VITE_FONTE_GUIAS || 'mock') === 'mock'
+const USAR_MOCK_GUIAS = import.meta.env.VITE_USE_MOCK === 'true'
 
 function normalizarProcedimento(procedimento) {
   const dados = procedimento && typeof procedimento === 'object' ? procedimento : {}
   return {
     atendimentoId: dados.atendimentoId ?? dados.id ?? null,
-    descricao: dados.descricao ?? 'Procedimento',
+    // #64 manda "nome"; o mock antigo mandava "descricao".
+    descricao: dados.nome ?? dados.descricao ?? 'Procedimento',
     status: dados.status ?? '',
     qtdRealizada: dados.qtdRealizada,
     qtdAutorizada: dados.qtdAutorizada
@@ -22,7 +26,7 @@ export function normalizarGuias(dados) {
   return dados.map(guia => {
     const dadosGuia = guia && typeof guia === 'object' ? guia : {}
     return {
-      id: dadosGuia.id ?? null,
+      id: dadosGuia.guiaId ?? dadosGuia.id ?? null,
       numero: dadosGuia.numero ?? null,
       status: dadosGuia.status ?? '',
       diasRestantes: dadosGuia.diasRestantes,
@@ -43,9 +47,9 @@ export function normalizarQrCode(dados) {
 
 export async function listarGuias(precCp) {
   try {
-    const dados = USAR_MOCK
-      ? await mockListarGuias(precCp)
-      : (await axios.get(`http://localhost:8080/beneficiarios/${encodeURIComponent(precCp)}/guias`)).data
+    const dados = USAR_MOCK_GUIAS
+      ? await mockListarGuiasDoBeneficiario(precCp)
+      : (await api.get(`/beneficiarios/${encodeURIComponent(precCp)}/guias`)).data
     return normalizarGuias(dados)
   } catch (erro) {
     throw traduzirErro(erro, {

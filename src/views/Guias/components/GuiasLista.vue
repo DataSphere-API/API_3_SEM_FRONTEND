@@ -55,10 +55,10 @@ defineEmits(['abrir-guia'])
         class="fx-botao"
         @click="$emit('abrir-guia', guia)"
       >
-        Ver QR Code
+        Ver detalhes
       </button>
 
-      <p v-else class="fx-suave">Guia expirada: sem acesso ao QR Code.</p>
+      <p v-else class="fx-suave">Guia expirada.</p>
     </li>
   </ul>
 </template>
