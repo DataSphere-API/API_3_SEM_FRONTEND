@@ -10,7 +10,12 @@ const props = defineProps({
 
 const labels = {
   ativa: 'Ativa',
-  regerada: 'Regerada'
+  regerada: 'Regerada',
+  em_aberto: 'Em auditoria',
+  aprovado: 'Aprovado',
+  reprovado: 'Reprovado · corrigir',
+  faturado: 'Faturado',
+  cancelado: 'Cancelado'
 }
 
 const label = computed(() => labels[props.status] || props.status)
@@ -40,5 +45,20 @@ const label = computed(() => labels[props.status] || props.status)
 .status-regerada {
   background-color: var(--secondary-color);
   color: var(--text-color);
+}
+
+.status-em_aberto {
+  background-color: #fbf1dc;
+  color: #7a4f00;
+}
+
+.status-aprovado {
+  background-color: #e5eee8;
+  color: #1e4d36;
+}
+
+.status-reprovado {
+  background-color: #fbe7e4;
+  color: #a3261b;
 }
 </style>
