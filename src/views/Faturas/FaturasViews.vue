@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import axios from 'axios'
+import { api } from '../../services/http.js'
 import FaturasList from './Components/FaturasList.vue'
 import BotaoEncaminhar from './Components/BotaoEncaminhar.vue'
 import BotaoRegerar from './Components/BotaoRegerar.vue'
@@ -37,7 +37,7 @@ function formatarData(data) {
 
 async function carregarFaturas() {
   try {
-    const response = await axios.get('http://localhost:8080/faturas')
+    const response = await api.get('/faturas')
     if (response.data && response.data.length > 0) {
       faturas.value = response.data.map(mapearFatura)
       return

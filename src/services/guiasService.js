@@ -1,4 +1,3 @@
-import axios from 'axios'
 import { api } from './http.js'
 import { mockBuscarQrCode } from '../mocks/guiasMock.js'
 import { mockListarGuiasDoBeneficiario } from '../mocks/checkMutuoMock.js'
@@ -31,8 +30,8 @@ export function normalizarGuias(dados) {
       status: dadosGuia.status ?? '',
       diasRestantes: dadosGuia.diasRestantes,
       procedimentos: Array.isArray(dadosGuia.procedimentos)
-        ? dadosGuia.procedimentos.map(normalizarProcedimento)
-        : []
+          ? dadosGuia.procedimentos.map(normalizarProcedimento)
+          : []
     }
   })
 }
@@ -48,8 +47,8 @@ export function normalizarQrCode(dados) {
 export async function listarGuias(precCp) {
   try {
     const dados = USAR_MOCK_GUIAS
-      ? await mockListarGuiasDoBeneficiario(precCp)
-      : (await api.get(`/beneficiarios/${encodeURIComponent(precCp)}/guias`)).data
+        ? await mockListarGuiasDoBeneficiario(precCp)
+        : (await api.get(`/beneficiarios/${encodeURIComponent(precCp)}/guias`)).data
     return normalizarGuias(dados)
   } catch (erro) {
     throw traduzirErro(erro, {
@@ -62,8 +61,8 @@ export async function listarGuias(precCp) {
 export async function buscarQrCode(atendimentoId) {
   try {
     const dados = USAR_MOCK
-      ? await mockBuscarQrCode(atendimentoId)
-      : (await axios.get(`http://localhost:8080/atendimentos/${atendimentoId}/qrcode`)).data
+        ? await mockBuscarQrCode(atendimentoId)
+        : (await api.get(`/atendimentos/${atendimentoId}/qrcode`)).data
     return normalizarQrCode(dados)
   } catch (erro) {
     throw traduzirErro(erro, {
