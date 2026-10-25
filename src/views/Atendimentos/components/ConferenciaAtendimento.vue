@@ -6,6 +6,14 @@ const props = defineProps({
   dados: {
     type: Object,
     required: true
+  },
+  codigo: {
+    type: String,
+    default: ''
+  },
+  cnpj: {
+    type: String,
+    default: ''
   }
 })
 
@@ -28,7 +36,7 @@ async function registrarSessao() {
   sucessoMsg.value = ''
 
   try {
-    await svcRegistrarSessao(props.dados.atendimentoId)
+    await svcRegistrarSessao(props.dados.atendimentoId, props.cnpj || props.dados.ocs?.cnpj)
     sucessoMsg.value = 'Sessão registrada com sucesso!'
 
     // Força o incremento fixo e unitário, blindando contra saltos duplos
@@ -54,17 +62,17 @@ async function confirmarBaixa() {
   sucessoMsg.value = ''
 
   try {
-    await validarBaixaQr(props.dados.atendimentoId)
+    await validarBaixaQr(props.dados.atendimentoId, props.codigo, props.cnpj || props.dados.ocs?.cnpj)
     emit('baixa-confirmada', props.dados)
   } catch (err) {
     const codigo = err.codigo || ''
     if (codigo === 'QR_NAO_ENCONTRADO' || err.status === 404) {
       erro.value = 'QR Code inválido ou não encontrado.'
-    } else if (codigo === 'QR_JA_UTILIZADO') {
+    } else if (codigo === 'PROCEDIMENTO_JA_REALIZADO') {
       erro.value = 'Este QR Code já foi utilizado.'
-    } else if (codigo === 'OCS_DIFERENTE') {
+    } else if (codigo === 'OCS_DIFERENTE_DO_CONTRATO') {
       erro.value = 'OCS diferente da autorizada no contrato.'
-    } else if (codigo === 'GUIA_VENCIDA') {
+    } else if (codigo === 'GUIA_EXPIRADA') {
       erro.value = 'Guia vencida. Atendimento não permitido.'
     } else {
       erro.value = err.mensagemUsuario || 'Sessões incompletas para realizar a baixa.'
