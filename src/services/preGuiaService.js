@@ -24,7 +24,7 @@ export async function listarPreGuias() {
 export async function buscarPreGuia(id) {
   try {
     if (USAR_MOCK) return await mockBuscarPreGuia(id)
-    const response = await api.get(`/pre-guias/${id}/documento-conferencia`)
+    const response = await api.get(`/pre-guias/${id}`)
     return response.data
   } catch (erro) {
     throw traduzirErro(erro, { 404: 'Pré-guia não encontrada.' })

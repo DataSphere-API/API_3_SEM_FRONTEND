@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import axios from 'axios'
+import { api } from '../../../services/http.js'
 
 const props = defineProps({
   faturaId: {
@@ -36,7 +36,7 @@ async function regerar() {
       }
     }
 
-    const response = await axios.post(`http://localhost:8080/faturas/${props.faturaId}/regerar`)
+    const response = await api.post(`/faturas/${props.faturaId}/regerar`)
     emit('regerada', response.data)
   } catch (err) {
     erro.value = err.response?.data?.mensagem || 'Aviso: Não é possível regerar a fatura enquanto a auditoria estiver pendente.'

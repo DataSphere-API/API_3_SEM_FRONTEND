@@ -1,238 +1,151 @@
 <script setup>
-import { ref, watch } from 'vue'
-import QRCode from 'qrcode'
-import { buscarQrCode } from '../../../services/guiasService.js'
-import {
-  alertaValidade,
-  resumoSessoes,
-  rotuloStatus,
-  situacaoQr,
-  tomStatus
-} from '../../../utils/guiaRegras.js'
+import { ref, computed } from 'vue'
 
 const props = defineProps({
-  aberto: {
-    type: Boolean,
-    default: false
-  },
-  guia: {
-    type: Object,
-    default: null
-  }
+  visivel: Boolean,
+  procedimento: Object,
+  urlQrCode: String
 })
 
-defineEmits(['fechar'])
+const emit = defineEmits(['fechar'])
+const copiado = ref(false)
+const ampliado = ref(false)
 
-const qrs = ref({})
-const ampliado = ref(null)
+const sessoesRestantes = computed(() => {
+  if (!props.procedimento) return 0
+  return (props.procedimento.qtdAutorizada || 0) - (props.procedimento.qtdRealizada || 0)
+})
 
-async function carregarQr(guiaAtual, atendimentoId) {
-  qrs.value = {
-    ...qrs.value,
-    [atendimentoId]: { carregando: true, erro: '', imagem: '' }
-  }
+const deveExibirQr = computed(() => {
+  if (!props.procedimento) return false
+  const status = props.procedimento.status
+  const realizado = sessoesRestantes.value <= 0
+  const expirado = status === 'EXPIRADO' || status === 'REALIZADO'
 
+  return !realizado && !expirado
+})
+
+function copiarCodigo(codigo) {
+  navigator.clipboard.writeText(codigo)
+  copiado.value = true
+  setTimeout(() => {
+    copiado.value = false
+  }, 2500)
+}
+
+// Função para baixar a imagem do QR Code automaticamente
+async function baixarQrCode() {
   try {
-    const { codigo } = await buscarQrCode(atendimentoId)
-    const imagem = await QRCode.toDataURL(codigo, { width: 320, margin: 2 })
-
-    if (props.guia !== guiaAtual) {
-      return
-    }
-
-    qrs.value = {
-      ...qrs.value,
-      [atendimentoId]: { carregando: false, erro: '', imagem }
-    }
-  } catch (erro) {
-    if (props.guia !== guiaAtual) {
-      return
-    }
-
-    qrs.value = {
-      ...qrs.value,
-      [atendimentoId]: {
-        carregando: false,
-        erro: erro.mensagemUsuario || 'Não foi possível gerar o QR Code.',
-        imagem: ''
-      }
-    }
+    const response = await fetch(props.urlQrCode)
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `qrcode-${props.procedimento?.atendimentoId || 'procedimento'}.png`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    console.error('Erro ao baixar QR Code', e)
+    window.open(props.urlQrCode, '_blank')
   }
-}
-
-// Validação por QR Code ficou fora do escopo da sprint (a baixa é pelo check mútuo).
-const QR_NO_ESCOPO = false
-
-function carregarQrs() {
-  qrs.value = {}
-  ampliado.value = null
-
-  if (!QR_NO_ESCOPO || !props.aberto || !props.guia) {
-    return
-  }
-
-  const guiaAtual = props.guia
-
-  guiaAtual.procedimentos.forEach(proc => {
-    if (situacaoQr(guiaAtual, proc).exibir) {
-      carregarQr(guiaAtual, proc.atendimentoId)
-    }
-  })
-}
-
-watch([() => props.aberto, () => props.guia], carregarQrs, { immediate: true })
-
-function situacao(proc) {
-  if (!QR_NO_ESCOPO) return { exibir: false, mensagem: '' }
-  return situacaoQr(props.guia, proc)
-}
-
-function ampliar(proc) {
-  ampliado.value = {
-    imagem: qrs.value[proc.atendimentoId].imagem,
-    titulo: proc.descricao
-  }
-}
-
-function baixar(proc) {
-  const link = document.createElement('a')
-  const nome = `qrcode-${props.guia.numero || 'guia'}-${proc.atendimentoId}`
-
-  link.href = qrs.value[proc.atendimentoId].imagem
-  link.download = `${nome.replace(/[^\w.-]+/g, '-')}.png`
-  link.click()
 }
 </script>
 
 <template>
-  <div v-if="aberto && guia" class="fx-modal-fundo" @click.self="$emit('fechar')">
-    <div class="fx-modal" role="dialog" aria-modal="true">
-      <header class="fx-modal-topo">
-        <div>
-          <h2>Guia {{ guia.numero }}</h2>
-          <p>{{ rotuloStatus(guia.status) }}</p>
-        </div>
-
-        <button type="button" class="fx-fechar" aria-label="Fechar" @click="$emit('fechar')">
-          ×
-        </button>
+  <div v-if="visivel" class="modal-overlay">
+    <div class="fx-cartao modal-conteudo">
+      <header class="modal-cabecalho">
+        <h2>Detalhe do Procedimento</h2>
+        <button type="button" class="fx-botao-secundario" @click="emit('fechar')">✕</button>
       </header>
 
-      <div class="fx-modal-corpo">
-        <p v-if="alertaValidade(guia)" class="fx-alerta fx-alerta-ambar" role="alert">
-          {{ alertaValidade(guia) }}
+      <div class="conteudo-qr">
+        <p><strong>{{ procedimento?.nome }}</strong></p>
+        <p class="fx-suave">
+          Sessões realizadas: {{ procedimento?.qtdRealizada || 0 }} / {{ procedimento?.qtdAutorizada || 0 }}
         </p>
 
-        <p v-if="guia.procedimentos.length === 0" class="fx-alerta fx-alerta-cinza">
-          Esta guia não possui procedimentos.
-        </p>
+        <template v-if="deveExibirQr">
+          <div class="container-qrcode" :class="{ 'qrcode-ampliado': ampliado }" @click="ampliado = false">
+            <img :src="urlQrCode" alt="QR Code do Atendimento" />
+          </div>
+          <span v-if="ampliado" class="fx-suave dica-fechar">Clique na imagem para fechar o zoom</span>
 
-        <section v-for="(proc, i) in guia.procedimentos" :key="i" class="fx-cartao">
-          <div class="proc-topo">
-            <strong>{{ proc.descricao }}</strong>
-            <span class="fx-selo" :class="'fx-selo-' + tomStatus(proc.status)">
-              {{ rotuloStatus(proc.status) }}
-            </span>
+          <div class="fx-acoes">
+            <button type="button" class="fx-botao" @click="ampliado = !ampliado">
+              {{ ampliado ? 'Reduzir' : 'Ampliar' }}
+            </button>
+            <button type="button" class="fx-botao-secundario" @click="baixarQrCode">
+              Baixar PNG
+            </button>
           </div>
 
-          <span class="fx-suave">{{ resumoSessoes(proc).texto }}</span>
-
-          <template v-if="situacao(proc).exibir">
-            <p v-if="qrs[proc.atendimentoId]?.carregando" class="fx-suave">
-              Gerando QR Code...
-            </p>
-
-            <p
-              v-else-if="qrs[proc.atendimentoId]?.erro"
-              class="fx-alerta fx-alerta-vermelho"
-              role="alert"
-            >
-              {{ qrs[proc.atendimentoId].erro }}
-            </p>
-
-            <div v-else-if="qrs[proc.atendimentoId]?.imagem" class="qr-area">
-              <img
-                :src="qrs[proc.atendimentoId].imagem"
-                :alt="'QR Code de ' + proc.descricao"
-                class="qr-imagem"
-              />
-
-              <div class="qr-botoes">
-                <button type="button" class="fx-botao-secundario" @click="ampliar(proc)">
-                  Ampliar
-                </button>
-                <button type="button" class="fx-botao" @click="baixar(proc)">
-                  Baixar PNG
+          <div class="bloco-manual">
+            <label class="fx-campo">
+              <span class="fx-suave">Código para digitação manual (caso a leitura falhe):</span>
+              <div class="input-com-copia">
+                <input
+                  type="text"
+                  class="fx-entrada fx-mono"
+                  readonly
+                  :value="procedimento?.codigoManual || procedimento?.atendimentoId || 'ATEND-9823-XYZ7'"
+                />
+                <button
+                  type="button"
+                  class="fx-botao-secundario"
+                  @click="copiarCodigo(procedimento?.codigoManual || procedimento?.atendimentoId || 'ATEND-9823-XYZ7')"
+                >
+                  {{ copiado ? 'Copiado!' : 'Copiar' }}
                 </button>
               </div>
-            </div>
-          </template>
+            </label>
+          </div>
+        </template>
 
-          <p v-else-if="situacao(proc).mensagem" class="fx-alerta fx-alerta-cinza">{{ situacao(proc).mensagem }}</p>
-        </section>
+        <template v-else>
+          <div class="fx-alerta fx-alerta-cinza">
+            <template v-if="sessoesRestantes > 0">
+              Faltam {{ sessoesRestantes }} sessão(ões) para este procedimento.
+            </template>
+            <template v-else>
+              Procedimento concluído ou expirado. QR Code indisponível.
+            </template>
+          </div>
+        </template>
+
       </div>
 
-      <footer class="fx-modal-rodape">
-        <button type="button" class="fx-botao-secundario" @click="$emit('fechar')">
-          Voltar
-        </button>
-      </footer>
-    </div>
-
-    <div v-if="ampliado" class="fx-modal-fundo fx-ampliado" @click.self="ampliado = null">
-      <div class="ampliado-caixa">
-        <strong>{{ ampliado.titulo }}</strong>
-        <img :src="ampliado.imagem" :alt="'QR Code ampliado de ' + ampliado.titulo" />
-        <button type="button" class="fx-botao" @click="ampliado = null">Fechar</button>
+      <div class="rodape-modal">
+        <button type="button" class="fx-botao-secundario" @click="emit('fechar')">Fechar</button>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.proc-topo {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
 }
-
-.qr-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
+.modal-conteudo {
+  background: #fff; width: 100%; max-width: 450px;
+  padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;
 }
-
-.qr-imagem {
-  width: 180px;
-  height: 180px;
-  padding: 0.5rem;
-  border: 1px solid var(--fx-borda);
-  border-radius: 14px;
+.modal-cabecalho { display: flex; justify-content: space-between; align-items: center; }
+.conteudo-qr { display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center; }
+.container-qrcode img { width: 180px; height: 180px; object-fit: contain; border: 1px solid var(--fx-borda); padding: 6px; border-radius: 6px; cursor: pointer; transition: transform 0.2s; }
+.container-qrcode.qrcode-ampliado {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000;
 }
-
-.qr-botoes {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
+.container-qrcode.qrcode-ampliado img {
+  width: 320px; height: 320px; background: #fff; padding: 1rem; border-radius: 8px;
 }
-
-.ampliado-caixa {
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.9rem;
-  background-color: #ffffff;
-  border-radius: 20px;
-  color: var(--fx-texto);
-  font-family: var(--fx-fonte);
-}
-
-.ampliado-caixa img {
-  width: min(80vw, 360px);
-  height: auto;
-}
+.dica-fechar { font-size: 0.75rem; color: #666; margin-top: -0.5rem; }
+.bloco-manual { width: 100%; text-align: left; margin-top: 0.5rem; border-top: 1px solid var(--fx-borda); padding-top: 1rem; }
+.input-com-copia { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.25rem; }
+.rodape-modal { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
 </style>

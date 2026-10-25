@@ -5,6 +5,8 @@ import ConferenciaAtendimento from './components/ConferenciaAtendimento.vue'
 import { consultarQr } from '../../services/atendimentoService.js'
 
 const dados = ref(null)
+const codigoLido = ref('')
+const cnpjLido = ref('')
 const carregando = ref(false)
 const erro = ref('')
 const sucessoMsg = ref('')
@@ -14,6 +16,8 @@ async function aoQrLido({ codigo, cnpj }) {
   erro.value = ''
   sucessoMsg.value = ''
   dados.value = null
+  codigoLido.value = codigo
+  cnpjLido.value = cnpj
 
   await nextTick()
 
@@ -24,11 +28,11 @@ async function aoQrLido({ codigo, cnpj }) {
     const cod = e.codigo || ''
     if (cod === 'QR_NAO_ENCONTRADO' || e.status === 404) {
       erro.value = 'QR Code inválido ou não encontrado.'
-    } else if (cod === 'QR_JA_UTILIZADO') {
+    } else if (cod === 'PROCEDIMENTO_JA_REALIZADO') {
       erro.value = 'Este QR Code já foi utilizado.'
-    } else if (cod === 'OCS_DIFERENTE') {
+    } else if (cod === 'OCS_DIFERENTE_DO_CONTRATO') {
       erro.value = 'OCS diferente da autorizada no contrato.'
-    } else if (cod === 'GUIA_VENCIDA') {
+    } else if (cod === 'GUIA_EXPIRADA') {
       erro.value = 'Guia vencida. Atendimento não permitido.'
     } else {
       erro.value = e.mensagemUsuario || 'Ocorreu um erro na validação.'
@@ -62,6 +66,8 @@ function aoBaixaConfirmada(detalhes) {
         v-if="dados"
         :key="dados.atendimentoId"
         :dados="dados"
+        :codigo="codigoLido"
+        :cnpj="cnpjLido"
         @baixa-confirmada="aoBaixaConfirmada"
       />
     </div>

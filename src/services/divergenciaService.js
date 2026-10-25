@@ -1,8 +1,8 @@
-import axios from 'axios'
+import { api } from './http.js'
 
 export async function buscarDivergencias(faturaId) {
   try {
-    const response = await axios.get(`http://localhost:8080/faturas/${faturaId}/divergencias`)
+    const response = await api.get(`/faturas/${faturaId}/divergencias`)
     return response.data
   } catch (error) {
     const err = new Error()

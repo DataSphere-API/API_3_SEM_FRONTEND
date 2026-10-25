@@ -1,6 +1,7 @@
 import axios from 'axios'
+import { api } from './http.js'
 
-const USAR_MOCK = true
+const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 export async function buscarLisura(faturaId, options = {}) {
   if (!faturaId || faturaId === 'undefined' || faturaId === 'null') {
@@ -33,7 +34,7 @@ export async function buscarLisura(faturaId, options = {}) {
   }
 
   try {
-    const response = await axios.get(`http://localhost:8080/faturas/${faturaId}/lisura`, options)
+    const response = await api.get(`/faturas/${faturaId}/lisura`, options)
     return response.data
   } catch (error) {
     const err = new Error()
