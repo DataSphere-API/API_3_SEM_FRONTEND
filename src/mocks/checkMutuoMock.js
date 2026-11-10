@@ -1,9 +1,9 @@
 // Check mútuo sem coluna nova no banco: o pedido da OCS vira o status AGUARDANDO_CONFIRMACAO do
 // Guia_Proc, e a linha em Sessao_Procedimento só é gravada quando o beneficiário confirma.
 import { banco, persistir, proximoId, copiar, registrarHistorico } from './bancoMock.js'
-import { erroHttp, esperar } from './auxiliares.js'
+import { erroHttp, esperar, somarDias, VALIDADE_DIAS_MOCK } from './auxiliares.js'
 import { sessao } from '../stores/sessao.js'
-import { numeroPreGuia, somarDias, VALIDADE_DIAS } from '../utils/fluxoPreGuia.js'
+import { numeroPreGuia } from '../utils/fluxoPreGuia.js'
 
 function hoje() {
   return new Date().toISOString().slice(0, 10)
@@ -45,7 +45,7 @@ export function atendimentos() {
           qtdRealizada: sessoes.length,
           statusProcedimento,
           aguardandoConfirmacao: Boolean(p.aguardandoConfirmacao),
-          dataValidade: somarDias(guia.dataEmissao, VALIDADE_DIAS),
+          dataValidade: somarDias(guia.dataEmissao, VALIDADE_DIAS_MOCK),
           // Data da última sessão confirmada: é ela que define em que período o atendimento entra no espelho.
           dataRealizacao: sessoes.length ? sessoes[sessoes.length - 1].dataRealizacao : null,
           espelhoId: espelhoDo(p.atendimentoId)
@@ -179,7 +179,7 @@ export async function mockListarGuiasDoBeneficiario(precCp) {
         numero: numeroPreGuia(guia.id),
         status: 'EMITIDA',
         dataEmissao: guia.dataEmissao,
-        diasRestantes: Math.max(VALIDADE_DIAS - diasDesdeEmissao, 0),
+        diasRestantes: Math.max(VALIDADE_DIAS_MOCK - diasDesdeEmissao, 0),
         procedimentos: lista
           .filter(a => a.guiaId === guia.id)
           .map(a => ({

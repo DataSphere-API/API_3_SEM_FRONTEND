@@ -1,6 +1,11 @@
 <script setup>
 import { ref } from 'vue'
-import { validarPreGuia } from '../../../services/preGuiaService.js'
+import {
+  validarPreGuia,
+  baixarPacoteSire,
+  baixarDocumentoConferencia
+} from '../../../services/preGuiaService.js'
+import { salvarArquivo } from '../../../utils/download.js'
 
 const props = defineProps({
   preGuia: {
@@ -12,12 +17,14 @@ const props = defineProps({
 const emit = defineEmits(['atualizar'])
 
 const carregando = ref(false)
+const baixando = ref(null) // 'json' | 'pdf' | null
 const erro = ref('')
 
 function deveMostrarValidar() {
   return props.preGuia?.status === 'PRE_GUIA' || props.preGuia?.status === 'COM_PENDENCIAS'
 }
 
+// Só APROVADA ou EMITIDA libera pacote e PDF (o back também valida).
 function devePermitirDownload() {
   return props.preGuia?.status === 'APROVADA' || props.preGuia?.status === 'EMITIDA'
 }
@@ -35,27 +42,24 @@ async function executarValidacao() {
   }
 }
 
+async function baixar(tipo, buscarArquivo, nomeArquivo) {
+  erro.value = ''
+  baixando.value = tipo
+  try {
+    salvarArquivo(await buscarArquivo(props.preGuia.id), nomeArquivo)
+  } catch (err) {
+    erro.value = err.mensagemUsuario || 'Não foi possível baixar o arquivo.'
+  } finally {
+    baixando.value = null
+  }
+}
+
 function baixarJson() {
-  const dados = JSON.stringify(props.preGuia, null, 2)
-  const blob = new Blob([dados], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `pre-guia-${props.preGuia.id}.json`
-  a.click()
-  URL.revokeObjectURL(url)
+  return baixar('json', baixarPacoteSire, `pacote-sire-${props.preGuia.id}.json`)
 }
 
 function baixarPdf() {
-  // Simula o download do pacote SIRE em PDF gerando um Blob sem usar alertas em popup
-  const conteudoPdf = `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/Resources<<>>/MediaBox[0 0 595 842]>>endobj xref\n0 4\n0000000000 65535 f \n000000000; trailer<</Root 1 0 R>>\n%%EOF`
-  const blob = new Blob([conteudoPdf], { type: 'application/pdf' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `pacote-sire-${props.preGuia.id}.pdf`
-  a.click()
-  URL.revokeObjectURL(url)
+  return baixar('pdf', baixarDocumentoConferencia, `documento-conferencia-${props.preGuia.id}.pdf`)
 }
 </script>
 
@@ -91,11 +95,11 @@ function baixarPdf() {
       </button>
 
       <template v-if="devePermitirDownload()">
-        <button type="button" class="fx-botao-secundario" @click="baixarJson">
-          Baixar JSON
+        <button type="button" class="fx-botao-secundario" :disabled="baixando !== null" @click="baixarJson">
+          {{ baixando === 'json' ? 'Baixando...' : 'Baixar pacote SIRE (JSON)' }}
         </button>
-        <button type="button" class="fx-botao" @click="baixarPdf">
-          Baixar PDF (SIRE)
+        <button type="button" class="fx-botao" :disabled="baixando !== null" @click="baixarPdf">
+          {{ baixando === 'pdf' ? 'Baixando...' : 'Baixar PDF de conferência' }}
         </button>
       </template>
     </div>
