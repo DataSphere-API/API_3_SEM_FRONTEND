@@ -27,8 +27,8 @@ async function carregar() {
   erro.value = ''
   try {
     const [listaGuias, listaEspelhos] = await Promise.all([
-      listarPreGuiasDoFluxo({ status: 'EMITIDA' }),
-      listarEspelhos()
+      listarPreGuiasDoFluxo({ status: 'EMITIDA' }, { usarMock: false }),
+      listarEspelhos({}, { usarMock: false })
     ])
     guias.value = listaGuias.sort((a, b) => b.id - a.id)
     espelhos.value = listaEspelhos.sort((a, b) => b.id - a.id)
@@ -43,7 +43,7 @@ async function abrirGuia(id) {
   carregandoHistorico.value = true
   erro.value = ''
   try {
-    const guia = await buscarPreGuiaDoFluxo(id)
+    const guia = await buscarPreGuiaDoFluxo(id, { usarMock: false })
     const historicos = await Promise.all(guia.procedimentos.map(p => historicoDoAtendimento(p.atendimentoId)))
     historicosDaGuia.value = Object.fromEntries(guia.procedimentos.map((p, i) => [p.atendimentoId, historicos[i]]))
     guiaAberta.value = guia

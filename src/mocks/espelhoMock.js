@@ -4,7 +4,6 @@
 import { banco, persistir, proximoId, copiar, registrarHistorico, valorContratadoDoAtendimento } from './bancoMock.js'
 import { erroHttp, esperar } from './auxiliares.js'
 import { atendimentos } from './checkMutuoMock.js'
-import { incluirEspelhoNaFatura } from './faturaMensalMock.js'
 import { competenciaDe, competenciasAbertasParaEspelho, rotuloCompetencia } from '../utils/competencia.js'
 
 function resumo(espelho) {
@@ -129,40 +128,6 @@ export async function mockCriarEspelho({ ocsId, dataInicio, dataFim, itens }) {
   return resumo(espelho)
 }
 
-function decidir(id, statusNovo, motivo, origem) {
-  const espelho = encontrar(id)
-  if (espelho.status !== 'EM_ABERTO') {
-    throw erroHttp(409, { codigo: 'ESPELHO_JA_AUDITADO', mensagem: 'Este espelho já foi auditado.' })
-  }
-  espelho.status = statusNovo
-  // Aprovado limpa o motivo; reenviado mantém o último motivo para o auditor conferir a correção.
-  espelho.motivoReprovacao = motivo
-  espelho.dataAtualizacao = new Date().toISOString()
-  registrarHistorico('ESPELHO', espelho.id, 'EM_ABERTO', statusNovo, origem)
-  persistir()
-  return resumo(espelho)
-}
-
-// Aprovado, o espelho entra na fatura mensal da OCS.
-export async function mockAprovarEspelho(id) {
-  await esperar(400)
-  const espelho = encontrar(id)
-  if (espelho.status !== 'EM_ABERTO') {
-    throw erroHttp(409, { codigo: 'ESPELHO_JA_AUDITADO', mensagem: 'Este espelho já foi auditado.' })
-  }
-  const fatura = incluirEspelhoNaFatura(espelho)
-  const resposta = decidir(id, 'APROVADO', null, 'auditoria')
-  return { ...resposta, faturaId: fatura.id, competencia: fatura.competencia }
-}
-
-export async function mockReprovarEspelho(id, motivo) {
-  await esperar(400)
-  if (!motivo?.trim()) {
-    throw erroHttp(400, { codigo: 'MOTIVO_OBRIGATORIO', mensagem: 'O motivo da reprovação é obrigatório.' })
-  }
-  return decidir(id, 'REPROVADO', motivo.trim(), 'auditoria')
-}
-
 // ---------- Correção pela OCS de um espelho reprovado ----------
 
 function espelhoParaCorrigir(id) {
@@ -218,14 +183,4 @@ export async function mockReenviarEspelho(id) {
   registrarHistorico('ESPELHO', espelho.id, 'REPROVADO', 'EM_ABERTO', 'reenvio-pela-ocs')
   persistir()
   return resumo(espelho)
-}
-
-// GET /guias/{id}/historico (o id é do Guia_Proc = atendimento) e GET /espelhos/{id}/historico.
-export async function mockHistorico(entidadeTipo, id) {
-  await esperar(250)
-  return copiar(
-    banco()
-      .historico.filter(h => h.entidadeTipo === entidadeTipo && h.entidadeId === Number(id))
-      .sort((a, b) => a.data.localeCompare(b.data))
-  )
 }
