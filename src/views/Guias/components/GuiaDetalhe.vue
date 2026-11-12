@@ -130,8 +130,8 @@ function baixar(proc) {
         <section v-for="(proc, i) in guia.procedimentos" :key="i" class="fx-cartao">
           <div class="proc-topo">
             <strong>{{ proc.descricao }}</strong>
-            <span class="fx-selo" :class="'fx-selo-' + tomStatus(proc.status)">
-              {{ rotuloStatus(proc.status) }}
+            <span class="fx-selo" :class="'fx-selo-' + tomStatus(proc.statusPainel)">
+              {{ rotuloStatus(proc.statusPainel) }}
             </span>
           </div>
 

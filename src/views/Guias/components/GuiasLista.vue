@@ -37,7 +37,12 @@ defineEmits(['abrir-guia'])
 
       <div v-for="(proc, i) in guia.procedimentos" :key="i" class="procedimento">
         <div class="procedimento-linha">
-          <span>{{ proc.descricao }}</span>
+          <span>
+            {{ proc.descricao }}
+            <span v-if="proc.statusPainel" class="fx-selo" :class="'fx-selo-' + tomStatus(proc.statusPainel)">
+              {{ rotuloStatus(proc.statusPainel) }}
+            </span>
+          </span>
           <strong>{{ resumoSessoes(proc).texto }}</strong>
         </div>
 

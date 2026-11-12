@@ -1,57 +1,45 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import GuiasLista from './components/GuiasLista.vue'
 import GuiaDetalhe from './components/GuiaDetalhe.vue'
-import { listarGuias } from '../../services/guiasService.js'
+import { listarGuias, listarPreGuiasDoBeneficiario } from '../../services/guiasService.js'
 import { sessao } from '../../stores/sessao.js'
+import { rotuloStatus, tomStatus } from '../../utils/guiaRegras.js'
 
-// O beneficiário logado já tem Prec-CP: a busca manual só aparece sem ele.
-const precCpDoLogin = sessao.usuario?.precCp || ''
-const precCp = ref(precCpDoLogin)
 const guias = ref([])
+const preGuias = ref([])
 const carregando = ref(false)
-const erro = ref('')
-const consultou = ref(false)
+const erros = ref([])
 const guiaSelecionada = ref(null)
 
-let sequencia = 0
-
 async function buscar() {
-  const valor = precCp.value.trim()
-
-  if (!valor) {
-    erro.value = 'Informe o PrecCP do beneficiário.'
+  const precCp = sessao.usuario?.precCp
+  if (!precCp) {
+    erros.value = ['O Prec-CP do beneficiário não está disponível na sessão.']
     return
   }
 
-  const minhaSequencia = ++sequencia
-
   carregando.value = true
-  erro.value = ''
-  guias.value = []
-
+  erros.value = []
   try {
-    const lista = await listarGuias(valor)
-
-    if (minhaSequencia === sequencia) {
-      guias.value = lista
-      consultou.value = true
+    const [emitidas, solicitadas] = await Promise.allSettled([
+      listarGuias(precCp, { usarMock: false }),
+      listarPreGuiasDoBeneficiario(precCp)
+    ])
+    guias.value = emitidas.status === 'fulfilled' ? emitidas.value : []
+    preGuias.value = solicitadas.status === 'fulfilled' ? solicitadas.value : []
+    if (emitidas.status === 'rejected') {
+      erros.value.push(emitidas.reason?.mensagemUsuario || 'Não foi possível carregar as guias.')
     }
-  } catch (e) {
-    if (minhaSequencia === sequencia) {
-      erro.value = e.mensagemUsuario || 'Não foi possível carregar as guias.'
-      consultou.value = false
+    if (solicitadas.status === 'rejected') {
+      erros.value.push(solicitadas.reason?.mensagemUsuario || 'Não foi possível carregar as solicitações.')
     }
   } finally {
-    if (minhaSequencia === sequencia) {
-      carregando.value = false
-    }
+    carregando.value = false
   }
 }
 
-onMounted(() => {
-  if (precCpDoLogin) buscar()
-})
+onMounted(buscar)
 </script>
 
 <template>
@@ -59,48 +47,38 @@ onMounted(() => {
     <div class="fx-conteudo">
       <header>
         <h1 class="fx-titulo">Minhas guias</h1>
-        <p class="fx-subtitulo">
-          Acompanhe o status das guias e o progresso de cada procedimento.
-        </p>
+        <p class="fx-subtitulo">Acompanhe o status das guias e o progresso de cada procedimento.</p>
       </header>
-
-      <form v-if="!precCpDoLogin" class="fx-cartao busca" @submit.prevent="buscar">
-        <label class="fx-campo">
-          PrecCP do beneficiário
-          <input
-            v-model="precCp"
-            type="text"
-            class="fx-entrada"
-            placeholder="Ex.: 100100100-00"
-            autocomplete="off"
-          />
-        </label>
-
-        <button type="submit" class="fx-botao" :disabled="carregando">
-          Buscar guias
-        </button>
-      </form>
 
       <p v-if="carregando" class="fx-alerta fx-alerta-cinza" role="status">
         Carregando guias...
       </p>
 
-      <div v-else-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">
-        <p class="mensagem-erro">{{ erro }}</p>
-        <button type="button" class="fx-botao-secundario" @click="buscar">
-          Tentar novamente
-        </button>
-      </div>
+      <template v-else>
+        <div v-if="erros.length" class="fx-alerta fx-alerta-vermelho" role="alert">
+          <p v-for="(erro, indice) in erros" :key="indice">{{ erro }}</p>
+          <button type="button" class="fx-botao-secundario" @click="buscar">Tentar novamente</button>
+        </div>
 
-      <p v-else-if="consultou && guias.length === 0" class="fx-alerta fx-alerta-cinza">
-        Nenhuma guia encontrada para este beneficiário.
-      </p>
+        <section v-if="preGuias.length" aria-labelledby="solicitacoes">
+          <h2 id="solicitacoes" class="fx-secao-titulo">Solicitações</h2>
+          <ul class="fx-lista">
+            <li v-for="(preGuia, indice) in preGuias" :key="preGuia.preGuiaId ?? preGuia.id ?? indice" class="fx-cartao">
+              <div class="solicitacao-topo">
+                <span>Pré-guia {{ preGuia.numero || preGuia.preGuiaId || preGuia.id || '' }}</span>
+                <span class="fx-selo" :class="'fx-selo-' + tomStatus('SOLICITADA')">
+                  {{ rotuloStatus('SOLICITADA') }}
+                </span>
+              </div>
+            </li>
+          </ul>
+        </section>
 
-      <GuiasLista
-        v-else-if="guias.length > 0"
-        :guias="guias"
-        @abrir-guia="guiaSelecionada = $event"
-      />
+        <GuiasLista v-if="guias.length" :guias="guias" @abrir-guia="guiaSelecionada = $event" />
+        <p v-else-if="!erros.length && !preGuias.length" class="fx-alerta fx-alerta-cinza">
+          Nenhuma guia ou solicitação encontrada para este beneficiário.
+        </p>
+      </template>
     </div>
 
     <GuiaDetalhe
@@ -112,13 +90,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.busca {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: flex-end;
-}
-
-.mensagem-erro {
-  margin: 0 0 0.6rem;
+.solicitacao-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
 }
 </style>
