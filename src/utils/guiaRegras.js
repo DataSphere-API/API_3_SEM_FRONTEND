@@ -33,20 +33,19 @@ export function rotuloStatus(status) {
   return texto.charAt(0).toUpperCase() + texto.slice(1)
 }
 
+const TONS_STATUS = {
+  SOLICITADA: 'cinza',
+  EMITIDA: 'azul',
+  REALIZADA: 'verde',
+  FATURADA: 'ambar',
+  APROVADA: 'roxo',
+  LIQUIDADA: 'petroleo',
+  EXPIRADA: 'vermelho'
+}
+
 export function tomStatus(status) {
-  if (statusComecaCom(status, 'EXPIRAD')) {
-    return 'vermelho'
-  }
-
-  if (statusComecaCom(status, 'REALIZAD')) {
-    return 'verde'
-  }
-
-  if (!semAcento(status)) {
-    return 'cinza'
-  }
-
-  return 'azul'
+  const chave = semAcento(status)
+  return TONS_STATUS[chave] || (chave ? 'azul' : 'cinza')
 }
 
 export function resumoSessoes(procedimento) {

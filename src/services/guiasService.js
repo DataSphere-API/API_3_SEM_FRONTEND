@@ -11,10 +11,11 @@ function normalizarProcedimento(procedimento) {
   return {
     atendimentoId: dados.atendimentoId ?? dados.id ?? null,
     // #64 manda "nome"; o mock antigo mandava "descricao".
-    descricao: dados.nome ?? dados.descricao ?? 'Procedimento',
+    descricao: dados.procedimento ?? dados.nome ?? dados.descricao ?? 'Procedimento',
     status: dados.status ?? '',
-    qtdRealizada: dados.qtdRealizada,
-    qtdAutorizada: dados.qtdAutorizada
+    statusPainel: dados.statusPainel ?? dados.status ?? '',
+    qtdRealizada: dados.sessoesFeitas ?? dados.qtdRealizada,
+    qtdAutorizada: dados.sessoesAutorizadas ?? dados.qtdAutorizada
   }
 }
 
@@ -44,9 +45,9 @@ export function normalizarQrCode(dados) {
   return { codigo: codigo.trim() }
 }
 
-export async function listarGuias(precCp) {
+export async function listarGuias(precCp, { usarMock = USAR_MOCK_GUIAS } = {}) {
   try {
-    const dados = USAR_MOCK_GUIAS
+    const dados = usarMock
         ? await mockListarGuiasDoBeneficiario(precCp)
         : (await api.get(`/beneficiarios/${encodeURIComponent(precCp)}/guias`)).data
     return normalizarGuias(dados)
@@ -55,6 +56,17 @@ export async function listarGuias(precCp) {
       404: 'Nenhuma guia encontrada para este PrecCP.',
       padrao: 'Não foi possível carregar as guias.'
     })
+  }
+}
+
+export async function listarPreGuiasDoBeneficiario(precCp) {
+  try {
+    const { data } = await api.get(`/beneficiarios/${encodeURIComponent(precCp)}/pre-guias`)
+    if (!Array.isArray(data)) throw erroDeFormato()
+
+    return data
+  } catch (erro) {
+    throw traduzirErro(erro, { 403: 'Você não tem acesso a essas solicitações.' })
   }
 }
 
