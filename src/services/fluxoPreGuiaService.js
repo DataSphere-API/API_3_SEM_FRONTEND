@@ -14,9 +14,9 @@ import { traduzirErro } from '../utils/erros.js'
 const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 // #75 — resumo. Para o MEDICO o back devolve só as pré-guias em que ele é o responsável.
-export async function listarPreGuiasDoFluxo(filtros = {}) {
+export async function listarPreGuiasDoFluxo(filtros = {}, { usarMock = USAR_MOCK } = {}) {
   try {
-    if (USAR_MOCK) return await mockListarPreGuias(filtros)
+    if (usarMock) return await mockListarPreGuias(filtros)
     const response = await api.get('/pre-guias', { params: filtros })
     return response.data
   } catch (erro) {
@@ -25,9 +25,9 @@ export async function listarPreGuiasDoFluxo(filtros = {}) {
 }
 
 // #76 — detalhe.
-export async function buscarPreGuiaDoFluxo(id) {
+export async function buscarPreGuiaDoFluxo(id, { usarMock = USAR_MOCK } = {}) {
   try {
-    if (USAR_MOCK) return await mockBuscarPreGuia(id)
+    if (usarMock) return await mockBuscarPreGuia(id)
     const response = await api.get(`/pre-guias/${id}`)
     return response.data
   } catch (erro) {
