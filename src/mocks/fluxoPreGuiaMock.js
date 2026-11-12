@@ -1,10 +1,10 @@
 // Fluxo da pré-guia nos contratos das issues US005 e US006 (#75 a #78, #81, #82),
 // com a aprovação dupla (médico + chefe) usando os campos da V8.
 import { banco, persistir, proximoId, copiar, registrarHistorico, nomeDoUsuario } from './bancoMock.js'
-import { erroHttp, esperar } from './auxiliares.js'
+import { erroHttp, esperar, somarDias, VALIDADE_DIAS_MOCK } from './auxiliares.js'
 import { sessao } from '../stores/sessao.js'
 
-import { EDITAVEIS, VALIDADE_DIAS, somarDias } from '../utils/fluxoPreGuia.js'
+import { EDITAVEIS } from '../utils/fluxoPreGuia.js'
 
 function hoje() {
   return new Date().toISOString().slice(0, 10)
@@ -66,7 +66,7 @@ function detalhe(preGuia) {
     dataAprovacaoChefe: preGuia.dataAprovacaoChefe,
     motivoReprovacao: preGuia.motivoReprovacao,
     dataEmissao: preGuia.dataEmissao,
-    validoAte: preGuia.dataEmissao ? somarDias(preGuia.dataEmissao, VALIDADE_DIAS) : null
+    validoAte: preGuia.dataEmissao ? somarDias(preGuia.dataEmissao, VALIDADE_DIAS_MOCK) : null
   })
 }
 
@@ -268,7 +268,7 @@ export async function mockEmitirGuia(id) {
     guiaId: preGuia.id,
     status: preGuia.status,
     dataEmissao: preGuia.dataEmissao,
-    validoAte: somarDias(preGuia.dataEmissao, VALIDADE_DIAS),
+    validoAte: somarDias(preGuia.dataEmissao, VALIDADE_DIAS_MOCK),
     procedimentos: preGuia.procedimentos.map(p => ({ atendimentoId: p.atendimentoId }))
   }
 }

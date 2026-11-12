@@ -4,7 +4,7 @@ import PreGuiaResumo from '../../components/PreGuiaResumo.vue'
 import { listarPreGuiasDoFluxo, buscarPreGuiaDoFluxo, emitirGuia } from '../../services/fluxoPreGuiaService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
-import { numeroPreGuia, somarDias, VALIDADE_DIAS } from '../../utils/fluxoPreGuia.js'
+import { numeroPreGuia } from '../../utils/fluxoPreGuia.js'
 
 const preGuias = ref([])
 const carregando = ref(false)
@@ -13,17 +13,32 @@ const aviso = ref('')
 const erroEmissao = ref('')
 const emitindo = ref(null)
 const aberta = ref(null)
+// id da pré-guia -> validoAte devolvido pelo back (a listagem não traz esse campo).
+const validades = ref({})
 
 const prontas = computed(() => preGuias.value.filter(p => p.status === 'APROVADA'))
 const emitidas = computed(() =>
   preGuias.value.filter(p => p.status === 'EMITIDA').sort((a, b) => (b.dataEmissao || '').localeCompare(a.dataEmissao || ''))
 )
 
+// Busca o validoAte das emitidas ainda sem validade conhecida. Falha em uma não derruba a tela.
+async function carregarValidades() {
+  const faltando = emitidas.value.filter(p => !(p.id in validades.value))
+  if (faltando.length === 0) return
+  const resultados = await Promise.allSettled(faltando.map(p => buscarPreGuiaDoFluxo(p.id)))
+  const novas = { ...validades.value }
+  resultados.forEach((resultado, i) => {
+    if (resultado.status === 'fulfilled') novas[faltando[i].id] = resultado.value.validoAte
+  })
+  validades.value = novas
+}
+
 async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
     preGuias.value = await listarPreGuiasDoFluxo()
+    await carregarValidades()
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar as pré-guias aprovadas.'
   } finally {
@@ -49,7 +64,8 @@ async function emitir(id) {
   emitindo.value = id
   try {
     const guia = await emitirGuia(id)
-    aviso.value = `Guia ${numeroPreGuia(id)} emitida em ${formatarData(guia.dataEmissao)}, válida até ${formatarData(guia.validoAte)}. Os atendimentos já aparecem para as OCS.`
+    validades.value = { ...validades.value, [id]: guia.validoAte }
+    aviso.value = `Guia ${numeroPreGuia(id)} emitida em ${formatarData(guia.dataEmissao)}, válida até ${formatarData(guia.validoAte)}. Os procedimentos já estão disponíveis para as OCS na tela de Atendimentos.`
     aberta.value = null
     await carregar()
   } catch (e) {
@@ -68,7 +84,7 @@ onMounted(carregar)
       <header>
         <h1 class="fx-titulo">Pré-guias aprovadas</h1>
         <p class="fx-subtitulo">
-          Aprovadas pelo Médico e pelo Chefe do FUSEx. Emita a guia; ela vale por {{ VALIDADE_DIAS }} dias.
+          Aprovadas pelo Médico e pelo Chefe do FUSEx. Emita a guia; o prazo de validade é definido pelo sistema na emissão.
         </p>
       </header>
 
@@ -118,7 +134,7 @@ onMounted(carregar)
                 <td class="fx-mono">{{ numeroPreGuia(p.id) }}</td>
                 <td>{{ p.beneficiarioNome }}</td>
                 <td>{{ formatarData(p.dataEmissao) }}</td>
-                <td>{{ p.dataEmissao ? formatarData(somarDias(p.dataEmissao, VALIDADE_DIAS)) : '—' }}</td>
+                <td>{{ formatarData(validades[p.id]) }}</td>
                 <td class="fx-mono">{{ formatarMoeda(p.valorTotal) }}</td>
               </tr>
               <tr v-if="emitidas.length === 0">
