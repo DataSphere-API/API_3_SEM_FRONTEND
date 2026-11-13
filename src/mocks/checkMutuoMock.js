@@ -3,7 +3,7 @@
 import { banco, persistir, proximoId, copiar, registrarHistorico } from './bancoMock.js'
 import { erroHttp, esperar } from './auxiliares.js'
 import { sessao } from '../stores/sessao.js'
-import { numeroPreGuia, somarDias, VALIDADE_DIAS } from '../utils/fluxoPreGuia.js'
+import { numeroGuia, somarDias, VALIDADE_DIAS } from '../utils/fluxoPreGuia.js'
 
 function hoje() {
   return new Date().toISOString().slice(0, 10)
@@ -37,7 +37,7 @@ export function atendimentos() {
         return {
           atendimentoId: p.atendimentoId,
           guiaId: guia.id,
-          guiaNumero: numeroPreGuia(guia.id),
+          guiaNumero: numeroPreGuia,
           beneficiario: { precCp: guia.beneficiarioPrecCp, nome: beneficiario?.nome || '—' },
           procedimento: db.procedimentos.find(x => x.id === p.procedimentoId)?.nome || '—',
           ocs: { cnpj: p.ocsCnpj, nome: ocs?.nome || '—' },
@@ -146,7 +146,7 @@ export async function mockConfirmarSessao(atendimentoId) {
   const depois = encontrarAtendimento(atendimentoId)
   const statusAntes = antes.qtdRealizada === 0 ? 'PENDENTE' : 'EM_ANDAMENTO'
   if (depois.statusProcedimento !== statusAntes) {
-    registrarHistorico('GUIA_PROC', antes.atendimentoId, statusAntes, depois.statusProcedimento, 'confirmacao-do-beneficiario')
+    registrarHistorico('GUIA_PROC', antes.atendimentoId, statusAntes, depois.statusProcedimento, 'validacao-qrcode')
   }
   persistir()
   return copiar(depois)

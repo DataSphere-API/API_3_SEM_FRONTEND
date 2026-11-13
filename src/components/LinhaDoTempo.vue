@@ -1,49 +1,29 @@
 <script setup>
 import { formatarDataHora } from '../utils/documentos.js'
+import {
+  traduzirEntidadeHistorico,
+  traduzirOrigemHistorico,
+  traduzirStatusHistorico
+} from '../utils/historico.js'
 
-// eventos no formato do HistoricoStatusResponse (US001-3).
+// eventos no formato do HistoricoStatusResponse.
 defineProps({
   eventos: { type: Array, required: true }
 })
-
-const STATUS = {
-  PENDENTE: 'A realizar',
-  EM_ANDAMENTO: 'Em andamento',
-  REALIZADA: 'Realizado',
-  FATURADA: 'Faturado',
-  EM_ABERTO: 'Recebido para auditoria',
-  APROVADO: 'Aprovado',
-  REPROVADO: 'Reprovado e devolvido à OCS',
-  FATURADO: 'Faturado',
-  CANCELADO: 'Cancelado',
-  ATIVA: 'Fatura aberta',
-  ENCAMINHADA_APROVACAO: 'Encaminhada para aprovação'
-}
-
-const ORIGEM = {
-  'emissao-da-guia': 'Guia emitida pelo FUSEx',
-  'confirmacao-do-beneficiario': 'Confirmado pelo beneficiário',
-  'envio-pela-ocs': 'Enviado pela OCS',
-  'reenvio-pela-ocs': 'Corrigido e reenviado pela OCS',
-  auditoria: 'Auditoria',
-  'aprovacao-do-espelho': 'Aberta com o primeiro espelho aprovado do mês',
-  'encaminhamento-para-aprovacao': 'Encaminhada para aprovação'
-}
-
-function rotulo(status) {
-  return STATUS[status] || status
-}
 </script>
 
 <template>
   <p v-if="eventos.length === 0" class="fx-suave vazio">Nenhuma mudança registrada.</p>
   <ol v-else class="linha">
-    <li v-for="e in eventos" :key="e.id" class="evento">
+    <li v-for="(e, i) in eventos" :key="`${e.id}-${i}`" class="evento">
       <span class="marcador" aria-hidden="true"></span>
       <div>
-        <strong>{{ rotulo(e.statusNovo) }}</strong>
-        <span v-if="e.statusAnterior" class="fx-suave"> (antes: {{ rotulo(e.statusAnterior) }})</span>
-        <div class="fx-suave">{{ formatarDataHora(e.data) }} · {{ ORIGEM[e.origem] || e.origem }}</div>
+        <strong>{{ traduzirStatusHistorico(e.statusNovo) }}</strong>
+        <span v-if="traduzirEntidadeHistorico(e.entidadeTipo)" class="fx-selo fx-selo-cinza entidade">
+          {{ traduzirEntidadeHistorico(e.entidadeTipo) }}
+        </span>
+        <span v-if="e.statusAnterior" class="fx-suave"> (antes: {{ traduzirStatusHistorico(e.statusAnterior) }})</span>
+        <div class="fx-suave">{{ formatarDataHora(e.data) }} · {{ traduzirOrigemHistorico(e.origem) }}</div>
       </div>
     </li>
   </ol>
@@ -76,5 +56,9 @@ function rotulo(status) {
   margin-top: 0.4rem;
   border-radius: 50%;
   background-color: var(--fx-verde);
+}
+
+.entidade {
+  margin-left: 0.4rem;
 }
 </style>
