@@ -67,3 +67,15 @@ export function traduzirOrigemHistorico(origem) {
 export function traduzirEntidadeHistorico(tipo) {
   return buscar(ENTIDADE, tipo, '', t => t.toUpperCase())
 }
+const ETAPA = {
+  SOLICITACAO: 'Solicitação',
+  APROVACAO: 'Aprovação',
+  EMISSAO: 'Emissão',
+  ATENDIMENTO: 'Atendimento',
+  ESPELHO: 'Espelho',
+  FATURA: 'Fatura'
+}
+
+export function traduzirEtapaLinhaDoTempo(etapa) {
+  return buscar(ETAPA, etapa, 'Etapa não informada', t => t.toUpperCase())
+}
