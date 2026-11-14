@@ -29,6 +29,7 @@ async function buscar() {
   carregando.value = true
   erro.value = ''
   guias.value = []
+  guiaSelecionada.value = null
 
   try {
     const lista = await listarGuias(valor)

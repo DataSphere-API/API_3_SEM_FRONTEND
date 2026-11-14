@@ -93,6 +93,14 @@ export function situacaoQr(guia, procedimento) {
     return { exibir: false, mensagem: 'Procedimento já realizado: QR Code indisponível.' }
   }
 
+  if (statusComecaCom(procedimento?.status, 'FATURAD')) {
+    return { exibir: false, mensagem: 'Procedimento já faturado: QR Code indisponível.' }
+  }
+
+  if (statusComecaCom(guia?.status, 'FINALIZAD')) {
+    return { exibir: false, mensagem: 'Guia finalizada: QR Code indisponível.' }
+  }
+
   if (statusComecaCom(procedimento?.status, 'EXPIRAD')) {
     return { exibir: false, mensagem: 'Procedimento expirado: QR Code indisponível.' }
   }
