@@ -19,7 +19,7 @@ defineEmits(['abrir-guia'])
 
 <template>
   <ul class="fx-lista">
-    <li v-for="(guia, indice) in guias" :key="indice" class="fx-cartao">
+    <li v-for="(guia, indice) in guias" :key="guia.id ?? indice" class="fx-cartao">
       <div class="guia-topo">
         <div class="guia-identificacao">
           <span class="fx-mono guia-numero">{{ guia.numero || 'Guia sem número' }}</span>

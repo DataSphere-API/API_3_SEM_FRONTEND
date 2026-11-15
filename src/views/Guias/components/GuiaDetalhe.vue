@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import QRCode from 'qrcode'
 import { buscarQrCode } from '../../../services/guiasService.js'
 import {
@@ -21,12 +21,17 @@ const props = defineProps({
   }
 })
 
-defineEmits(['fechar'])
+const emit = defineEmits(['fechar'])
 
 const qrs = ref({})
 const ampliado = ref(null)
+let sequencia = 0
 
-async function carregarQr(guiaAtual, atendimentoId) {
+function consultaAtual(guiaAtual, minhaSequencia) {
+  return props.aberto && props.guia === guiaAtual && minhaSequencia === sequencia
+}
+
+async function carregarQr(guiaAtual, atendimentoId, minhaSequencia) {
   qrs.value = {
     ...qrs.value,
     [atendimentoId]: { carregando: true, erro: '', imagem: '' }
@@ -34,9 +39,10 @@ async function carregarQr(guiaAtual, atendimentoId) {
 
   try {
     const { codigo } = await buscarQrCode(atendimentoId)
-    const imagem = await QRCode.toDataURL(codigo, { width: 320, margin: 2 })
+    if (!consultaAtual(guiaAtual, minhaSequencia)) return
+    const imagem = await QRCode.toDataURL(codigo, { type: 'image/png', width: 320, margin: 2 })
 
-    if (props.guia !== guiaAtual) {
+    if (!consultaAtual(guiaAtual, minhaSequencia)) {
       return
     }
 
@@ -45,7 +51,7 @@ async function carregarQr(guiaAtual, atendimentoId) {
       [atendimentoId]: { carregando: false, erro: '', imagem }
     }
   } catch (erro) {
-    if (props.guia !== guiaAtual) {
+    if (!consultaAtual(guiaAtual, minhaSequencia)) {
       return
     }
 
@@ -60,14 +66,12 @@ async function carregarQr(guiaAtual, atendimentoId) {
   }
 }
 
-// Validação por QR Code ficou fora do escopo da sprint (a baixa é pelo check mútuo).
-const QR_NO_ESCOPO = false
-
 function carregarQrs() {
+  const minhaSequencia = ++sequencia
   qrs.value = {}
   ampliado.value = null
 
-  if (!QR_NO_ESCOPO || !props.aberto || !props.guia) {
+  if (!props.aberto || !props.guia) {
     return
   }
 
@@ -75,7 +79,7 @@ function carregarQrs() {
 
   guiaAtual.procedimentos.forEach(proc => {
     if (situacaoQr(guiaAtual, proc).exibir) {
-      carregarQr(guiaAtual, proc.atendimentoId)
+      carregarQr(guiaAtual, proc.atendimentoId, minhaSequencia)
     }
   })
 }
@@ -83,11 +87,11 @@ function carregarQrs() {
 watch([() => props.aberto, () => props.guia], carregarQrs, { immediate: true })
 
 function situacao(proc) {
-  if (!QR_NO_ESCOPO) return { exibir: false, mensagem: '' }
   return situacaoQr(props.guia, proc)
 }
 
 function ampliar(proc) {
+  if (!qrs.value[proc.atendimentoId]?.imagem) return
   ampliado.value = {
     imagem: qrs.value[proc.atendimentoId].imagem,
     titulo: proc.descricao
@@ -95,21 +99,33 @@ function ampliar(proc) {
 }
 
 function baixar(proc) {
+  if (!qrs.value[proc.atendimentoId]?.imagem) return
   const link = document.createElement('a')
   const nome = `qrcode-${props.guia.numero || 'guia'}-${proc.atendimentoId}`
 
   link.href = qrs.value[proc.atendimentoId].imagem
   link.download = `${nome.replace(/[^\w.-]+/g, '-')}.png`
+  document.body.appendChild(link)
   link.click()
+  link.remove()
 }
+
+function aoPressionarTecla(evento) {
+  if (evento.key !== 'Escape' || !props.aberto) return
+  if (ampliado.value) ampliado.value = null
+  else emit('fechar')
+}
+
+onMounted(() => window.addEventListener('keydown', aoPressionarTecla))
+onBeforeUnmount(() => window.removeEventListener('keydown', aoPressionarTecla))
 </script>
 
 <template>
   <div v-if="aberto && guia" class="fx-modal-fundo" @click.self="$emit('fechar')">
-    <div class="fx-modal" role="dialog" aria-modal="true">
+    <div class="fx-modal" role="dialog" aria-modal="true" aria-labelledby="guia-detalhe-titulo">
       <header class="fx-modal-topo">
         <div>
-          <h2>Guia {{ guia.numero }}</h2>
+          <h2 id="guia-detalhe-titulo">{{ guia.numero ? 'Guia ' + guia.numero : 'Guia sem número' }}</h2>
           <p>{{ rotuloStatus(guia.status) }}</p>
         </div>
 
@@ -119,6 +135,10 @@ function baixar(proc) {
       </header>
 
       <div class="fx-modal-corpo">
+        <p class="fx-alerta fx-alerta-cinza">
+          Após concluir todas as sessões, apresente o QR Code na clínica para a baixa final do procedimento.
+          Ele será exibido somente quando liberado pelo sistema.
+        </p>
         <p v-if="alertaValidade(guia)" class="fx-alerta fx-alerta-ambar" role="alert">
           {{ alertaValidade(guia) }}
         </p>
@@ -127,7 +147,7 @@ function baixar(proc) {
           Esta guia não possui procedimentos.
         </p>
 
-        <section v-for="(proc, i) in guia.procedimentos" :key="i" class="fx-cartao">
+        <section v-for="(proc, i) in guia.procedimentos" :key="proc.atendimentoId ?? i" class="fx-cartao">
           <div class="proc-topo">
             <strong>{{ proc.descricao }}</strong>
             <span class="fx-selo" :class="'fx-selo-' + tomStatus(proc.status)">
@@ -139,7 +159,7 @@ function baixar(proc) {
 
           <template v-if="situacao(proc).exibir">
             <p v-if="qrs[proc.atendimentoId]?.carregando" class="fx-suave">
-              Gerando QR Code...
+              Consultando QR Code...
             </p>
 
             <p
@@ -180,7 +200,7 @@ function baixar(proc) {
     </div>
 
     <div v-if="ampliado" class="fx-modal-fundo fx-ampliado" @click.self="ampliado = null">
-      <div class="ampliado-caixa">
+      <div class="ampliado-caixa" role="dialog" aria-modal="true" :aria-label="'QR Code ampliado de ' + ampliado.titulo">
         <strong>{{ ampliado.titulo }}</strong>
         <img :src="ampliado.imagem" :alt="'QR Code ampliado de ' + ampliado.titulo" />
         <button type="button" class="fx-botao" @click="ampliado = null">Fechar</button>
