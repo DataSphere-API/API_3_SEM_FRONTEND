@@ -70,3 +70,36 @@ export async function emitirPreGuia(id) {
     throw traduzirErro(erro, { 422: 'Não foi possível emitir a guia.' })
   }
 }
+
+export async function obterPacoteSire(id) {
+  try {
+    if (USAR_MOCK) {
+      return {
+        preGuiaId: id,
+        sistema: 'SIRE-FUSEx',
+        geradoEm: new Date().toISOString(),
+        status: 'APROVADA',
+        mensagem: 'Pacote SIRE gerado com sucesso via mock.'
+      }
+    }
+    const response = await api.get(`/pre-guias/${id}/pacote-sire`)
+    return response.data
+  } catch (erro) {
+    throw traduzirErro(erro, { 404: 'Pacote SIRE não encontrado.' })
+  }
+}
+
+export async function obterDocumentoConferencia(id) {
+  try {
+    if (USAR_MOCK) {
+      const conteudoPdf = `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/Resources<<>>/MediaBox[0 0 595 842]>>endobj xref\n0 4\n0000000000 65535 f \n0000000000 00000 n \n%%EOF`
+      return new Blob([conteudoPdf], { type: 'application/pdf' })
+    }
+    const response = await api.get(`/pre-guias/${id}/documento-conferencia`, {
+      responseType: 'blob'
+    })
+    return response.data
+  } catch (erro) {
+    throw traduzirErro(erro, { 404: 'Documento de conferência não encontrado.' })
+  }
+}

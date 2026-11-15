@@ -1,48 +1,31 @@
 import { api } from './http.js'
-import { mockListarGuiasDoBeneficiario } from '../mocks/checkMutuoMock.js'
-import { erroDeFormato, traduzirErro } from '../utils/erros.js'
+import { traduzirErro } from '../utils/erros.js'
 
-const USAR_MOCK_GUIAS = import.meta.env.VITE_USE_MOCK === 'true'
+const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
-function normalizarProcedimento(procedimento) {
-  const dados = procedimento && typeof procedimento === 'object' ? procedimento : {}
-  return {
-    atendimentoId: dados.atendimentoId ?? dados.id ?? null,
-    descricao: dados.nome ?? dados.descricao ?? 'Procedimento',
-    status: dados.status ?? '',
-    qtdRealizada: dados.qtdRealizada,
-    qtdAutorizada: dados.qtdAutorizada
-  }
-}
-
-export function normalizarGuias(dados) {
-  if (!Array.isArray(dados)) {
-    throw erroDeFormato()
-  }
-  return dados.map(guia => {
-    const dadosGuia = guia && typeof guia === 'object' ? guia : {}
-    return {
-      id: dadosGuia.guiaId ?? dadosGuia.id ?? null,
-      numero: dadosGuia.numero ?? null,
-      status: dadosGuia.status ?? '',
-      diasRestantes: dadosGuia.diasRestantes,
-      procedimentos: Array.isArray(dadosGuia.procedimentos)
-          ? dadosGuia.procedimentos.map(normalizarProcedimento)
-          : []
-    }
-  })
-}
-
-export async function listarGuias(precCp) {
+export async function listarGuias() {
   try {
-    const dados = USAR_MOCK_GUIAS
-        ? await mockListarGuiasDoBeneficiario(precCp)
-        : (await api.get(`/beneficiarios/${encodeURIComponent(precCp)}/guias`)).data
-    return normalizarGuias(dados)
+    if (USAR_MOCK) {
+      return [
+        {
+          id: 1,
+          numero: 'G-2026-001',
+          beneficiario: 'João Pedro Lima',
+          status: 'EMITIDA',
+          dataEmissao: '2026-10-09'
+        },
+        {
+          id: 2,
+          numero: 'G-2026-002',
+          beneficiario: 'Ana Paula Souza',
+          status: 'EMITIDA',
+          dataEmissao: '2026-10-08'
+        }
+      ]
+    }
+    const response = await api.get('/guias')
+    return response.data
   } catch (erro) {
-    throw traduzirErro(erro, {
-      404: 'Nenhuma guia encontrada para este PrecCP.',
-      padrao: 'Não foi possível carregar as guias.'
-    })
+    throw traduzirErro(erro, { 404: 'Nenhuma guia encontrada.' })
   }
 }

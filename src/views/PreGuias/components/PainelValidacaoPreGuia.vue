@@ -1,6 +1,10 @@
 <script setup>
 import { ref } from 'vue'
-import { validarPreGuia } from '../../../services/preGuiaService.js'
+import {
+  validarPreGuia,
+  obterPacoteSire,
+  obterDocumentoConferencia
+} from '../../../services/preGuiaService.js'
 
 const props = defineProps({
   preGuia: {
@@ -12,14 +16,22 @@ const props = defineProps({
 const emit = defineEmits(['atualizar'])
 
 const carregando = ref(false)
+const baixando = ref(false)
 const erro = ref('')
 
+function obterStatusNormalizado() {
+  const raw = props.preGuia?.status || props.preGuia?.situacao || ''
+  return raw.toUpperCase()
+}
+
 function deveMostrarValidar() {
-  return props.preGuia?.status === 'PRE_GUIA' || props.preGuia?.status === 'COM_PENDENCIAS'
+  const status = obterStatusNormalizado()
+  return ['PRE_GUIA', 'COM_PENDENCIAS', 'RASCUNHO', 'COM PENDÊNCIAS'].includes(status)
 }
 
 function devePermitirDownload() {
-  return props.preGuia?.status === 'APROVADA' || props.preGuia?.status === 'EMITIDA'
+  const status = obterStatusNormalizado()
+  return ['APROVADA', 'EMITIDA'].includes(status)
 }
 
 async function executarValidacao() {
@@ -35,36 +47,50 @@ async function executarValidacao() {
   }
 }
 
-function baixarJson() {
-  const dados = JSON.stringify(props.preGuia, null, 2)
-  const blob = new Blob([dados], { type: 'application/json' })
+function dispararDownloadBlob(blob, nomeArquivo) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `pre-guia-${props.preGuia.id}.json`
+  a.download = nomeArquivo
   a.click()
   URL.revokeObjectURL(url)
 }
 
-function baixarPdf() {
-  // Simula o download do pacote SIRE em PDF gerando um Blob sem usar alertas em popup
-  const conteudoPdf = `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/Resources<<>>/MediaBox[0 0 595 842]>>endobj xref\n0 4\n0000000000 65535 f \n000000000; trailer<</Root 1 0 R>>\n%%EOF`
-  const blob = new Blob([conteudoPdf], { type: 'application/pdf' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `pacote-sire-${props.preGuia.id}.pdf`
-  a.click()
-  URL.revokeObjectURL(url)
+async function baixarJson() {
+  baixando.value = true
+  erro.value = ''
+  try {
+    const pacote = await obterPacoteSire(props.preGuia.id)
+    const dados = JSON.stringify(pacote, null, 2)
+    const blob = new Blob([dados], { type: 'application/json' })
+    dispararDownloadBlob(blob, `pacote-sire-${props.preGuia.id}.json`)
+  } catch (err) {
+    erro.value = err.mensagemUsuario || 'Não foi possível baixar o pacote SIRE (JSON).'
+  } finally {
+    baixando.value = false
+  }
+}
+
+async function baixarPdf() {
+  baixando.value = true
+  erro.value = ''
+  try {
+    const blob = await obterDocumentoConferencia(props.preGuia.id)
+    dispararDownloadBlob(blob, `documento-conferencia-${props.preGuia.id}.pdf`)
+  } catch (err) {
+    erro.value = err.mensagemUsuario || 'Não foi possível baixar o documento de conferência (PDF).'
+  } finally {
+    baixando.value = false
+  }
 }
 </script>
 
 <template>
   <div class="fx-cartao painel-validacao">
     <div class="validacao-topo">
-      <h3>Validação da Pré-Guia</h3>
-      <span class="fx-selo" :class="'fx-selo-' + (preGuia.status === 'APROVADA' ? 'verde' : 'ambar')">
-        {{ preGuia.status }}
+      <h3>Validação e Pacote SIRE</h3>
+      <span class="fx-selo" :class="'fx-selo-' + (devePermitirDownload() ? 'verde' : 'ambar')">
+        {{ preGuia.status || preGuia.situacao }}
       </span>
     </div>
 
@@ -72,7 +98,8 @@ function baixarPdf() {
       <p><strong>Pendências encontradas:</strong></p>
       <ul>
         <li v-for="(pendencia, index) in preGuia.pendencias" :key="index">
-          {{ pendencia.mensagem }}
+          <span v-if="pendencia.codigo" class="fx-mono">[{{ pendencia.codigo }}]</span>
+          {{ pendencia.mensagem || pendencia }}
         </li>
       </ul>
     </div>
@@ -91,11 +118,11 @@ function baixarPdf() {
       </button>
 
       <template v-if="devePermitirDownload()">
-        <button type="button" class="fx-botao-secundario" @click="baixarJson">
-          Baixar JSON
+        <button type="button" class="fx-botao-secundario" :disabled="baixando" @click="baixarJson">
+          {{ baixando ? 'Gerando...' : 'Baixar Pacote SIRE (JSON)' }}
         </button>
-        <button type="button" class="fx-botao" @click="baixarPdf">
-          Baixar PDF (SIRE)
+        <button type="button" class="fx-botao" :disabled="baixando" @click="baixarPdf">
+          {{ baixando ? 'Gerando...' : 'Baixar Documento de Conferência (PDF)' }}
         </button>
       </template>
     </div>
@@ -104,17 +131,24 @@ function baixarPdf() {
 
 <style scoped>
 .painel-validacao {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
 }
 .validacao-topo {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 0.75rem;
+}
+.validacao-topo h3 {
+  margin: 0;
+  font-size: 1rem;
 }
 .acoes-painel {
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
 }
 </style>
