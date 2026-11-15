@@ -1,5 +1,18 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, watch } from 'vue'
+import QRCode from 'qrcode'
+import { buscarQrCode } from '../../../services/guiasService.js'
+// 1. Importando a API e o seu novo componente
+import api from '../../../services/api'
+import LinhaDoTempo from './LinhaDoTempo.vue'
+
+import {
+  alertaValidade,
+  resumoSessoes,
+  rotuloStatus,
+  situacaoQr,
+  tomStatus
+} from '../../../utils/guiaRegras.js'
 
 const props = defineProps({
   visivel: Boolean,
@@ -7,9 +20,71 @@ const props = defineProps({
   urlQrCode: String
 })
 
-const emit = defineEmits(['fechar'])
-const copiado = ref(false)
-const ampliado = ref(false)
+defineEmits(['fechar'])
+
+const qrs = ref({})
+const ampliado = ref(null)
+
+// 2. Estados para a Linha do Tempo
+const linhaDoTempoDados = ref(null)
+const carregandoLinhaDoTempo = ref(false)
+const erroLinhaDoTempo = ref('')
+
+// Função que busca os dados no backend
+async function carregarLinhaDoTempo(guiaId) {
+  if (!guiaId) return
+
+  carregandoLinhaDoTempo.value = true
+  erroLinhaDoTempo.value = ''
+  linhaDoTempoDados.value = null
+
+  try {
+    // Chama o endpoint mapeado na US007-2
+    const response = await api.get(`/guias/${guiaId}/linha-do-tempo`)
+    linhaDoTempoDados.value = response.data
+  } catch (erro) {
+    console.error('Erro na linha do tempo:', erro)
+    erroLinhaDoTempo.value = 'Não foi possível carregar o histórico desta guia.'
+  } finally {
+    carregandoLinhaDoTempo.value = false
+  }
+}
+
+async function carregarQr(guiaAtual, atendimentoId) {
+  qrs.value = {
+    ...qrs.value,
+    [atendimentoId]: { carregando: true, erro: '', imagem: '' }
+  }
+
+  try {
+    const { codigo } = await buscarQrCode(atendimentoId)
+    const imagem = await QRCode.toDataURL(codigo, { width: 320, margin: 2 })
+
+    if (props.guia !== guiaAtual) {
+      return
+    }
+
+    qrs.value = {
+      ...qrs.value,
+      [atendimentoId]: { carregando: false, erro: '', imagem }
+    }
+  } catch (erro) {
+    if (props.guia !== guiaAtual) {
+      return
+    }
+
+    qrs.value = {
+      ...qrs.value,
+      [atendimentoId]: {
+        carregando: false,
+        erro: erro.mensagemUsuario || 'Não foi possível gerar o QR Code.',
+        imagem: ''
+      }
+    }
+  }
+}
+
+const QR_NO_ESCOPO = false
 
 const sessoesRestantes = computed(() => {
   if (!props.procedimento) return 0
@@ -22,8 +97,17 @@ const deveExibirQr = computed(() => {
   const realizado = sessoesRestantes.value <= 0
   const expirado = status === 'EXPIRADO' || status === 'REALIZADO'
 
-  return !realizado && !expirado
-})
+// 3. Atualizando o Watch para buscar os QR Codes e a Linha do Tempo quando abrir o modal
+watch([() => props.aberto, () => props.guia], () => {
+  carregarQrs()
+
+  if (props.aberto && props.guia) {
+    // ATENÇÃO: Verifique se o ID da guia no frontend é props.guia.id ou props.guia.guiaId
+    carregarLinhaDoTempo(props.guia.id || props.guia.guiaId)
+  } else {
+    linhaDoTempoDados.value = null
+  }
+}, { immediate: true })
 
 function copiarCodigo(codigo) {
   navigator.clipboard.writeText(codigo)
@@ -115,6 +199,22 @@ async function baixarQrCode() {
           </div>
         </template>
 
+          <p v-else-if="situacao(proc).mensagem" class="fx-alerta fx-alerta-cinza">{{ situacao(proc).mensagem }}</p>
+        </section>
+
+        <!-- 4. Nova seção da Linha do Tempo -->
+        <div class="linha-tempo-secao">
+          <hr class="divisor" />
+          <h3>Histórico da Guia</h3>
+
+          <p v-if="carregandoLinhaDoTempo" class="fx-suave">Carregando histórico...</p>
+          <p v-else-if="erroLinhaDoTempo" class="fx-alerta fx-alerta-vermelho">{{ erroLinhaDoTempo }}</p>
+          <LinhaDoTempo
+            v-else-if="linhaDoTempoDados"
+            :linhaDoTempo="linhaDoTempoDados"
+          />
+        </div>
+
       </div>
 
       <div class="rodape-modal">
@@ -144,8 +244,20 @@ async function baixarQrCode() {
 .container-qrcode.qrcode-ampliado img {
   width: 320px; height: 320px; background: #fff; padding: 1rem; border-radius: 8px;
 }
-.dica-fechar { font-size: 0.75rem; color: #666; margin-top: -0.5rem; }
-.bloco-manual { width: 100%; text-align: left; margin-top: 0.5rem; border-top: 1px solid var(--fx-borda); padding-top: 1rem; }
-.input-com-copia { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.25rem; }
-.rodape-modal { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+
+/* 5. Estilos para a seção da Linha do Tempo */
+.linha-tempo-secao {
+  margin-top: 1.5rem;
+}
+
+.divisor {
+  border: none;
+  border-top: 1px solid var(--fx-borda, #e5e7eb);
+  margin-bottom: 1.5rem;
+}
+
+.linha-tempo-secao h3 {
+  margin-bottom: 1rem;
+  color: var(--fx-texto);
+}
 </style>

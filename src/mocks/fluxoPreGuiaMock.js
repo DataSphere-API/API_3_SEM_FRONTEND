@@ -43,7 +43,8 @@ function resumo(preGuia) {
     dataCriacao: preGuia.dataCriacao,
     medicoAprovou: Boolean(preGuia.dataAprovacaoMedico),
     chefeAprovou: Boolean(preGuia.dataAprovacaoChefe),
-    dataEmissao: preGuia.dataEmissao
+    dataEmissao: preGuia.dataEmissao,
+    guiaId: preGuia.status === 'EMITIDA' ? preGuia.id : null
   }
 }
 
