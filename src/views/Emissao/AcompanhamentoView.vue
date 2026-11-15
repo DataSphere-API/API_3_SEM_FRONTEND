@@ -2,10 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import PreGuiaResumo from '../../components/PreGuiaResumo.vue'
+import PainelValidacaoPreGuia from '../PreGuias/components/PainelValidacaoPreGuia.vue'
 import {
   listarPreGuiasDoFluxo,
   buscarPreGuiaDoFluxo,
-  enviarParaAprovacao
+  enviarParaAprovacao,
+  emitirGuia
 } from '../../services/fluxoPreGuiaService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
@@ -17,6 +19,8 @@ const FILTROS = [
   { valor: 'TODAS', rotulo: 'Todas', status: null },
   { valor: 'ABERTAS', rotulo: 'Em andamento', status: ['PRE_GUIA', 'COM_PENDENCIAS', 'VALIDADA'] },
   { valor: 'COM_PENDENCIAS', rotulo: 'Com pendências', status: ['COM_PENDENCIAS'] },
+  { valor: 'APROVADA', rotulo: 'Aprovadas / Prontas', status: ['APROVADA'] },
+  { valor: 'EMITIDA', rotulo: 'Emitidas', status: ['EMITIDA'] },
   { valor: 'REPROVADA', rotulo: 'Reprovadas', status: ['REPROVADA'] }
 ]
 
@@ -24,8 +28,8 @@ const PRIORIDADE_STATUS = {
   COM_PENDENCIAS: 1,
   PRE_GUIA: 2,
   VALIDADA: 3,
-  REPROVADA: 4,
-  APROVADA: 5,
+  APROVADA: 4,
+  REPROVADA: 5,
   EMITIDA: 6
 }
 
@@ -38,6 +42,7 @@ const filtro = ref('TODAS')
 const termoBusca = ref('')
 const detalhe = ref(null)
 const enviando = ref(null)
+const emitindo = ref(null)
 
 function pesoPrioridade(status) {
   return PRIORIDADE_STATUS[status] ?? 99
@@ -96,6 +101,23 @@ async function enviar(p) {
   }
 }
 
+async function emitir(id) {
+  aviso.value = ''
+  emitindo.value = id
+  try {
+    const guia = await emitirGuia(id)
+    avisoTom.value = 'verde'
+    aviso.value = `Guia ${numeroPreGuia(id)} emitida com sucesso! Os atendimentos já aparecem para as OCS.`
+    detalhe.value = null
+    await carregar()
+  } catch (e) {
+    avisoTom.value = 'vermelho'
+    aviso.value = e.mensagemUsuario || 'Não foi possível emitir a guia.'
+  } finally {
+    emitindo.value = null
+  }
+}
+
 async function abrirDetalhe(id) {
   try {
     detalhe.value = await buscarPreGuiaDoFluxo(id)
@@ -113,7 +135,7 @@ onMounted(carregar)
       <header class="fx-topo-pagina">
         <div>
           <h1 class="fx-titulo">Acompanhamento das pré-guias</h1>
-          <p class="fx-subtitulo">Rascunhos, pendências e a situação de cada pré-guia com o Médico e o Chefe do FUSEx.</p>
+          <p class="fx-subtitulo">Rascunhos, pendências, aprovações e emissão de guias do FUSEx.</p>
         </div>
         <router-link to="/emissor/pre-guias/nova" class="fx-botao link-botao">Criar pré-guia</router-link>
       </header>
@@ -218,14 +240,30 @@ onMounted(carregar)
         <div class="fx-modal-corpo">
           <PreGuiaResumo :pre-guia="detalhe" />
 
-          <div v-if="EDITAVEIS.includes(detalhe.status)" class="modal-rodape-acoes">
+          <PainelValidacaoPreGuia
+            :pre-guia="detalhe"
+            @atualizar="carregar(); detalhe = null;"
+          />
+
+          <div class="modal-rodape-acoes">
+            <button
+              v-if="detalhe.status === 'APROVADA'"
+              type="button"
+              class="fx-botao"
+              :disabled="emitindo === detalhe.id"
+              @click="emitir(detalhe.id)"
+            >
+              {{ emitindo === detalhe.id ? 'Emitindo...' : 'Emitir Guia' }}
+            </button>
             <router-link
+              v-if="EDITAVEIS.includes(detalhe.status)"
               :to="`/emissor/pre-guias/${detalhe.id}/editar`"
               class="fx-botao-secundario link-botao"
             >
               Editar
             </router-link>
             <button
+              v-if="EDITAVEIS.includes(detalhe.status)"
               type="button"
               class="fx-botao"
               :class="{ 'btn-destaque-atencao': detalhe.status === 'COM_PENDENCIAS' }"

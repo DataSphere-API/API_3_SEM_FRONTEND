@@ -1,10 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import {
-  validarPreGuia,
-  obterPacoteSire,
-  obterDocumentoConferencia
-} from '../../../services/preGuiaService.js'
+import { validarPreGuia, obterPacoteSire, obterDocumentoConferencia } from '../../../services/fluxoPreGuiaService.js'
 
 const props = defineProps({
   preGuia: {
@@ -15,114 +11,123 @@ const props = defineProps({
 
 const emit = defineEmits(['atualizar'])
 
-const carregando = ref(false)
-const baixando = ref(false)
+const carregandoValidacao = ref(false)
+const baixandoJson = ref(false)
+const baixandoPdf = ref(false)
 const erro = ref('')
 
-function obterStatusNormalizado() {
-  const raw = props.preGuia?.status || props.preGuia?.situacao || ''
-  return raw.toUpperCase()
-}
+const deveMostrarValidar = () => ['PRE_GUIA', 'COM_PENDENCIAS', 'RASCUNHO'].includes(props.preGuia.status)
+const devePermitirDownload = () => ['APROVADA', 'EMITIDA'].includes(props.preGuia.status)
 
-function deveMostrarValidar() {
-  const status = obterStatusNormalizado()
-  return ['PRE_GUIA', 'COM_PENDENCIAS', 'RASCUNHO', 'COM PENDÊNCIAS'].includes(status)
-}
-
-function devePermitirDownload() {
-  const status = obterStatusNormalizado()
-  return ['APROVADA', 'EMITIDA'].includes(status)
-}
-
-async function executarValidacao() {
-  carregando.value = true
+async function acionarValidacao() {
   erro.value = ''
+  carregandoValidacao.value = true
   try {
     await validarPreGuia(props.preGuia.id)
     emit('atualizar')
-  } catch (err) {
-    erro.value = err.mensagemUsuario || 'Não foi possível validar a pré-guia.'
+  } catch (e) {
+    erro.value = e.mensagemUsuario || 'Erro ao validar pré-guia.'
   } finally {
-    carregando.value = false
+    carregandoValidacao.value = false
   }
 }
 
-function dispararDownloadBlob(blob, nomeArquivo) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = nomeArquivo
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 async function baixarJson() {
-  baixando.value = true
   erro.value = ''
+  baixandoJson.value = true
   try {
-    const pacote = await obterPacoteSire(props.preGuia.id)
-    const dados = JSON.stringify(pacote, null, 2)
-    const blob = new Blob([dados], { type: 'application/json' })
-    dispararDownloadBlob(blob, `pacote-sire-${props.preGuia.id}.json`)
-  } catch (err) {
-    erro.value = err.mensagemUsuario || 'Não foi possível baixar o pacote SIRE (JSON).'
+    const dadosServidor = await obterPacoteSire(props.preGuia.id)
+    const pacoteFinal = dadosServidor?.preGuia ? dadosServidor : {
+      versaoSire: "2.0",
+      dataGeracao: new Date().toISOString(),
+      preGuia: {
+        id: props.preGuia.id,
+        numero: props.preGuia.numero || `PG 00${props.preGuia.id}`,
+        status: props.preGuia.status,
+        beneficiario: props.preGuia.beneficiario || props.preGuia.beneficiarioNome,
+        precCp: props.preGuia.beneficiarioPrecCp || props.preGuia.precCp,
+        medicoResponsavel: props.preGuia.medico || props.preGuia.medicoResponsavel,
+        valorTotal: props.preGuia.valorTotal,
+        procedimentos: props.preGuia.procedimentos || props.preGuia.itens || []
+      },
+      dadosServidor
+    }
+
+    const blob = new Blob([JSON.stringify(pacoteFinal, null, 2)], { type: 'application/json' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `pacote-sire-${props.preGuia.id}.json`
+    link.click()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    erro.value = 'Erro ao baixar pacote SIRE.'
   } finally {
-    baixando.value = false
+    baixandoJson.value = false
   }
 }
 
 async function baixarPdf() {
-  baixando.value = true
   erro.value = ''
+  baixandoPdf.value = true
   try {
-    const blob = await obterDocumentoConferencia(props.preGuia.id)
-    dispararDownloadBlob(blob, `documento-conferencia-${props.preGuia.id}.pdf`)
-  } catch (err) {
-    erro.value = err.mensagemUsuario || 'Não foi possível baixar o documento de conferência (PDF).'
+    const resposta = await obterDocumentoConferencia(props.preGuia.id)
+    const blobPdf = resposta instanceof Blob ? resposta : new Blob([resposta], { type: 'application/pdf' })
+    const url = window.URL.createObjectURL(blobPdf)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `documento-conferencia-${props.preGuia.id}.pdf`
+    link.click()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    erro.value = 'Erro ao baixar documento PDF.'
   } finally {
-    baixando.value = false
+    baixandoPdf.value = false
   }
 }
 </script>
 
 <template>
-  <div class="fx-cartao painel-validacao">
-    <div class="validacao-topo">
-      <h3>Validação e Pacote SIRE</h3>
-      <span class="fx-selo" :class="'fx-selo-' + (devePermitirDownload() ? 'verde' : 'ambar')">
-        {{ preGuia.status || preGuia.situacao }}
-      </span>
-    </div>
+  <div class="painel-validacao fx-cartao">
+    <h3 class="fx-secao-titulo">Validação e Integração SIRE</h3>
 
-    <div v-if="preGuia.pendencias && preGuia.pendencias.length > 0" class="fx-alerta fx-alerta-vermelho" role="alert">
-      <p><strong>Pendências encontradas:</strong></p>
+    <p v-if="erro" class="fx-alerta fx-alerta-vermelho">{{ erro }}</p>
+
+    <div v-if="preGuia.validacao?.pendencias?.length" class="fx-alerta fx-alerta-ambar">
+      <strong>Pendências encontradas:</strong>
       <ul>
-        <li v-for="(pendencia, index) in preGuia.pendencias" :key="index">
-          <span v-if="pendencia.codigo" class="fx-mono">[{{ pendencia.codigo }}]</span>
-          {{ pendencia.mensagem || pendencia }}
-        </li>
+        <li v-for="(p, i) in preGuia.validacao.pendencias" :key="i">{{ p.mensagem }}</li>
       </ul>
     </div>
 
-    <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
-
-    <div class="acoes-painel">
+    <div class="fx-acoes-painel">
       <button
-        v-if="deveMostrarValidar()"
-        type="button"
-        class="fx-botao"
-        :disabled="carregando"
-        @click="executarValidacao"
+         v-if="deveMostrarValidar()"
+         type="button"
+         class="fx-botao"
+         :disabled="carregandoValidacao"
+         @click="acionarValidacao"
       >
-        {{ carregando ? 'Validando...' : 'Validar Pré-Guia' }}
+        {{ carregandoValidacao ? 'Validando...' : 'Validar Pré-Guia' }}
       </button>
 
       <template v-if="devePermitirDownload()">
-        <button type="button" class="fx-botao-secundario" :disabled="baixando" @click="baixarJson">
-          {{ baixando ? 'Gerando...' : 'Baixar Pacote SIRE (JSON)' }}
+        <button
+          type="button"
+          class="fx-botao-secundario"
+          :disabled="baixandoJson"
+          @click="baixarJson"
+        >
+          {{ baixandoJson ? 'Baixando JSON...' : 'Baixar Pacote SIRE (JSON)' }}
         </button>
-        <button type="button" class="fx-botao" :disabled="baixando" @click="baixarPdf">
-          {{ baixando ? 'Gerando...' : 'Baixar Documento de Conferência (PDF)' }}
+
+        <button
+          type="button"
+          class="fx-botao-secundario"
+          :disabled="baixandoPdf"
+          @click="baixarPdf"
+        >
+          {{ baixandoPdf ? 'Baixando PDF...' : 'Baixar Documento (PDF)' }}
         </button>
       </template>
     </div>
@@ -131,24 +136,13 @@ async function baixarPdf() {
 
 <style scoped>
 .painel-validacao {
-  margin-top: 1.25rem;
-  border-top: 1px solid #e2e8f0;
-  padding-top: 1rem;
+  margin-top: 1rem;
+  background-color: #fafafa;
 }
-.validacao-topo {
+.fx-acoes-painel {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-.validacao-topo h3 {
-  margin: 0;
-  font-size: 1rem;
-}
-.acoes-painel {
-  display: flex;
-  gap: 0.75rem;
   flex-wrap: wrap;
-  margin-top: 0.75rem;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 </style>
