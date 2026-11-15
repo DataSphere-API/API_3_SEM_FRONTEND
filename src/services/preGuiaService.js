@@ -6,6 +6,8 @@ import {
   mockAprovarPreGuia,
   mockReprovarPreGuia,
   mockEmitirPreGuia
+  mockBaixarPacoteSire,
+  mockBaixarDocumentoConferencia
 } from '../mocks/preGuiaMock.js'
 import { traduzirErro } from '../utils/erros.js'
 
@@ -68,5 +70,47 @@ export async function emitirPreGuia(id) {
     return response.data
   } catch (erro) {
     throw traduzirErro(erro, { 422: 'Não foi possível emitir a guia.' })
+  }
+}
+
+// Com responseType 'blob', o corpo do erro também chega como Blob.
+// Converte de volta para JSON para o traduzirErro ler a "mensagem" do back.
+async function lerErroDeBlob(erro) {
+  const dados = erro?.response?.data
+  if (dados instanceof Blob) {
+    try {
+      erro.response.data = JSON.parse(await dados.text())
+    } catch {
+      erro.response.data = null
+    }
+  }
+  return erro
+}
+
+const ERRO_DOWNLOAD = {
+  404: 'Pré-guia não encontrada.',
+  409: 'Só pré-guia aprovada ou emitida libera o pacote e o PDF.',
+  padrao: 'Não foi possível baixar o arquivo.'
+}
+
+// GET /pre-guias/{id}/pacote-sire (versão 1.0 com hash SHA-256). Devolve um Blob.
+export async function baixarPacoteSire(id) {
+  try {
+    if (USAR_MOCK) return await mockBaixarPacoteSire(id)
+    const response = await api.get(`/pre-guias/${id}/pacote-sire`, { responseType: 'blob' })
+    return response.data
+  } catch (erro) {
+    throw traduzirErro(await lerErroDeBlob(erro), ERRO_DOWNLOAD)
+  }
+}
+
+// GET /pre-guias/{id}/documento-conferencia (PDF). Devolve um Blob.
+export async function baixarDocumentoConferencia(id) {
+  try {
+    if (USAR_MOCK) return await mockBaixarDocumentoConferencia(id)
+    const response = await api.get(`/pre-guias/${id}/documento-conferencia`, { responseType: 'blob' })
+    return response.data
+  } catch (erro) {
+    throw traduzirErro(await lerErroDeBlob(erro), ERRO_DOWNLOAD)
   }
 }
