@@ -1,80 +1,27 @@
 <script setup>
-import { ref } from 'vue'
 import PainelValidacaoPreGuia from './PainelValidacaoPreGuia.vue'
-import { aprovarPreGuia, reprovarPreGuia, emitirPreGuia } from '../../../services/preGuiaService.js'
 
-const props = defineProps({
+defineProps({
   preGuia: {
     type: Object,
     required: true
+  },
+  emitindo: {
+    type: [Number, String, Boolean],
+    default: false
   }
 })
 
-const emit = defineEmits(['fechar', 'atualizar'])
+const emit = defineEmits(['fechar', 'editar', 'enviar', 'emitir', 'atualizar'])
 
-const carregando = ref(false)
-const erro = ref('')
-const erroModal = ref('')
-const exibirModalReprovacao = ref(false)
-const motivoReprovacao = ref('')
-
-function podeAprovarReprovar() {
-  return props.preGuia?.status === 'VALIDADA'
+function permiteEditarOuEnviar(preGuia) {
+  const status = (preGuia?.status || preGuia?.situacao || '').toUpperCase().trim()
+  return ['RASCUNHO', 'PRE_GUIA', 'COM_PENDENCIAS', 'COM PENDÊNCIAS'].includes(status)
 }
 
-function podeEmitir() {
-  return props.preGuia?.status === 'APROVADA'
-}
-
-async function executarAprovar() {
-  carregando.value = true
-  erro.value = ''
-  try {
-    await aprovarPreGuia(props.preGuia.id)
-    emit('atualizar')
-  } catch (err) {
-    erro.value = err.mensagemUsuario || 'Erro ao aprovar pré-guia.'
-  } finally {
-    carregando.value = false
-  }
-}
-
-function abrirModalReprovacao() {
-  motivoReprovacao.value = ''
-  erroModal.value = ''
-  exibirModalReprovacao.value = true
-}
-
-async function executarReprovar() {
-  if (!motivoReprovacao.value.trim()) {
-    erroModal.value = 'O motivo da reprovação é obrigatório.'
-    return
-  }
-  carregando.value = true
-  erroModal.value = ''
-  try {
-    await reprovarPreGuia(props.preGuia.id, motivoReprovacao.value)
-    exibirModalReprovacao.value = false
-    motivoReprovacao.value = ''
-    emit('atualizar')
-  } catch (err) {
-    erroModal.value = err.mensagemUsuario || 'Erro ao reprovar pré-guia.'
-  } finally {
-    carregando.value = false
-  }
-}
-
-async function executarEmitir() {
-  carregando.value = true
-  erro.value = ''
-  try {
-    await emitirPreGuia(props.preGuia.id)
-    emit('atualizar')
-  } catch (err) {
-    erro.value = err.mensagemUsuario || 'Erro ao emitir guia definitiva.'
-  } finally {
-    carregando.value = false
-  }
+function permiteEmitir(preGuia) {
+  const status = (preGuia?.status || preGuia?.situacao || '').toUpperCase().trim()
+  return status === 'APROVADA'
 }
 </script>
 
@@ -82,81 +29,49 @@ async function executarEmitir() {
   <div class="fx-cartao detalhe-container">
     <div class="detalhe-topo">
       <h3>Detalhes da Pré-Guia</h3>
-      <span class="fx-selo" :class="'fx-selo-' + (preGuia.status === 'APROVADA' ? 'verde' : 'ambar')">
-        {{ preGuia.status }}
-      </span>
+      <button type="button" class="fx-fechar" @click="emit('fechar')">&times;</button>
     </div>
 
     <p><strong>Número:</strong> {{ preGuia.numero }}</p>
-    <p><strong>Beneficiário:</strong> {{ preGuia.beneficiario }}</p>
-
-    <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
-
-    <div class="acoes-chefe">
-      <button
-        v-if="podeAprovarReprovar()"
-        type="button"
-        class="fx-botao"
-        :disabled="carregando"
-        @click="executarAprovar"
-      >
-        Aprovar Pré-Guia
-      </button>
-
-      <button
-        v-if="podeAprovarReprovar()"
-        type="button"
-        class="fx-botao-secundario btn-reprovar"
-        :disabled="carregando"
-        @click="abrirModalReprovacao"
-      >
-        Reprovar
-      </button>
-
-      <button
-        v-if="podeEmitir()"
-        type="button"
-        class="fx-botao"
-        :disabled="carregando"
-        @click="executarEmitir"
-      >
-        Emitir Guia Definitiva
-      </button>
-    </div>
+    <p><strong>Beneficiário:</strong> {{ preGuia.beneficiario?.nome || preGuia.beneficiarioNome || preGuia.beneficiario }}</p>
+    <p><strong>Situação:</strong> {{ preGuia.status || preGuia.situacao }}</p>
 
     <PainelValidacaoPreGuia
       :pre-guia="preGuia"
-      @atualizar="$emit('atualizar')"
+      @atualizar="emit('atualizar')"
     />
 
-    <!-- Modal de Reprovação com a mensagem de erro posicionada corretamente dentro dele -->
-    <div v-if="exibirModalReprovacao" class="fx-modal-fundo">
-      <div class="fx-modal">
-        <div class="fx-modal-topo">
-          <h2>Reprovar Pré-Guia</h2>
-          <button type="button" class="fx-fechar" @click="exibirModalReprovacao = false">&times;</button>
-        </div>
-        <div class="fx-modal-corpo">
-          <p v-if="erroModal" class="fx-alerta fx-alerta-vermelho" role="alert">
-            {{ erroModal }}
-          </p>
-          <label class="fx-campo">
-            Motivo da reprovação (Obrigatório):
-            <textarea
-              v-model="motivoReprovacao"
-              class="fx-entrada textarea-motivo"
-              placeholder="Digite o motivo detalhado..."
-              rows="4"
-            ></textarea>
-          </label>
-        </div>
-        <div class="fx-modal-rodape">
-          <button type="button" class="fx-botao-secundario" @click="exibirModalReprovacao = false">Cancelar</button>
-          <button type="button" class="fx-botao btn-confirmar-reprovar" @click="executarReprovar" :disabled="carregando">
-            Confirmar Reprovação
-          </button>
-        </div>
-      </div>
+    <div
+      v-if="permiteEditarOuEnviar(preGuia) || permiteEmitir(preGuia)"
+      class="modal-acoes-rodape"
+    >
+      <button
+        v-if="permiteEmitir(preGuia)"
+        type="button"
+        class="fx-botao"
+        :disabled="emitindo === preGuia.id || emitindo === true"
+        @click="emit('emitir', preGuia.id)"
+      >
+        {{ (emitindo === preGuia.id || emitindo === true) ? 'Emitindo...' : 'Emitir Guia' }}
+      </button>
+
+      <button
+        v-if="permiteEditarOuEnviar(preGuia)"
+        type="button"
+        class="fx-botao-secundario"
+        @click="emit('editar', preGuia)"
+      >
+        Editar
+      </button>
+
+      <button
+        v-if="permiteEditarOuEnviar(preGuia)"
+        type="button"
+        class="fx-botao"
+        @click="emit('enviar', preGuia)"
+      >
+        Enviar
+      </button>
     </div>
   </div>
 </template>
@@ -169,22 +84,14 @@ async function executarEmitir() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 1rem;
 }
-.acoes-chefe {
+.modal-acoes-rodape {
   display: flex;
+  justify-content: flex-end;
   gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--fx-borda);
-}
-.btn-reprovar {
-  border-color: #a3261b;
-  color: #a3261b;
-}
-.textarea-motivo {
-  height: auto;
-  padding: 0.5rem;
-  font-family: inherit;
+  border-top: 1px solid #e2e8f0;
 }
 </style>

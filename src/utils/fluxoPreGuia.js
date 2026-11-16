@@ -27,6 +27,10 @@ export function numeroPreGuia(id) {
   return `PG ${String(id).padStart(3, '0')}`
 }
 
+// O back não tem número de guia: o front mostra o id da guia emitida formatado.
+export function numeroGuia(id) {
+  return `GE ${String(id).padStart(3, '0')}`
+}
 export const VALIDADE_DIAS = 60
 
 export function somarDias(data, dias) {

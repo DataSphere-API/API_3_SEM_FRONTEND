@@ -2,22 +2,27 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import LinhaDoTempo from '../../components/LinhaDoTempo.vue'
-import { listarPreGuiasDoFluxo, buscarPreGuiaDoFluxo } from '../../services/fluxoPreGuiaService.js'
-import { listarEspelhos, historicoDoEspelho, historicoDoAtendimento } from '../../services/espelhoService.js'
+import { api } from '../../services/http.js'
+import { traduzirErro } from '../../utils/erros.js'
+import { listarEspelhos, historicoDoEspelho } from '../../services/espelhoService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
-import { numeroPreGuia } from '../../utils/fluxoPreGuia.js'
+import { numeroGuia } from '../../utils/fluxoPreGuia.js'
+import { traduzirStatusHistorico } from '../../utils/historico.js'
 
 const route = useRoute()
 
 const aba = ref(route.query.espelho ? 'espelhos' : 'guias')
 const guias = ref([])
+const guiasSemId = ref(0)
 const espelhos = ref([])
 const carregando = ref(false)
 const erro = ref('')
+const erroGuias = ref('')
+const erroEspelhos = ref('')
 
 const guiaAberta = ref(null)
-const historicosDaGuia = ref({})
+const linhaDaGuia = ref([])
 const espelhoAberto = ref(null)
 const historicoEspelho = ref([])
 const carregandoHistorico = ref(false)
@@ -26,12 +31,24 @@ async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    const [listaGuias, listaEspelhos] = await Promise.all([
-      listarPreGuiasDoFluxo({ status: 'EMITIDA' }, { usarMock: false }),
+    erroGuias.value = ''
+    erroEspelhos.value = ''
+    const [listaPreGuias, listaEspelhos] = await Promise.allSettled([
+      api.get('/pre-guias', { params: { status: 'EMITIDA' } }),
       listarEspelhos({}, { usarMock: false })
     ])
-    guias.value = listaGuias.sort((a, b) => b.id - a.id)
-    espelhos.value = listaEspelhos.sort((a, b) => b.id - a.id)
+    if (listaPreGuias.status === 'fulfilled') {
+      const preGuias = listaPreGuias.value.data
+      guias.value = preGuias.filter(g => g.guiaId != null).sort((a, b) => b.guiaId - a.guiaId)
+      guiasSemId.value = preGuias.length - guias.value.length
+    } else {
+      erroGuias.value = traduzirErro(listaPreGuias.reason, { 403: 'Seu perfil não tem acesso à listagem de guias.' }).mensagemUsuario
+    }
+    if (listaEspelhos.status === 'fulfilled') {
+      espelhos.value = listaEspelhos.value.sort((a, b) => b.id - a.id)
+    } else {
+      erroEspelhos.value = listaEspelhos.reason?.mensagemUsuario || 'Não foi possível carregar os espelhos.'
+    }
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar.'
   } finally {
@@ -39,16 +56,15 @@ async function carregar() {
   }
 }
 
-async function abrirGuia(id) {
+async function abrirGuia(guia) {
   carregandoHistorico.value = true
   erro.value = ''
   try {
-    const guia = await buscarPreGuiaDoFluxo(id, { usarMock: false })
-    const historicos = await Promise.all(guia.procedimentos.map(p => historicoDoAtendimento(p.atendimentoId)))
-    historicosDaGuia.value = Object.fromEntries(guia.procedimentos.map((p, i) => [p.atendimentoId, historicos[i]]))
+    const { data } = await api.get(`/guias/${guia.guiaId}/linha-do-tempo`)
+    linhaDaGuia.value = Array.isArray(data) ? data : data.eventos ?? []
     guiaAberta.value = guia
   } catch (e) {
-    erro.value = e.mensagemUsuario || 'Não foi possível carregar o histórico da guia.'
+    erro.value = traduzirErro(e, { 404: 'Histórico da guia indisponível.' }).mensagemUsuario
   } finally {
     carregandoHistorico.value = false
   }
@@ -81,7 +97,7 @@ onMounted(async () => {
     <div class="fx-conteudo">
       <header>
         <h1 class="fx-titulo">Histórico</h1>
-        <p class="fx-subtitulo">Cada mudança de situação das guias (por procedimento) e dos espelhos.</p>
+        <p class="fx-subtitulo">A linha do tempo de cada guia emitida e a de cada espelho.</p>
       </header>
 
       <div class="abas" role="tablist">
@@ -109,6 +125,8 @@ onMounted(async () => {
 
       <p v-if="carregando || carregandoHistorico" class="fx-alerta fx-alerta-cinza">Carregando...</p>
       <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
+      <p v-if="aba === 'guias' && erroGuias" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroGuias }}</p>
+      <p v-if="aba === 'espelhos' && erroEspelhos" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroEspelhos }}</p>
 
       <template v-if="aba === 'guias' && !carregando">
         <template v-if="guiaAberta">
@@ -117,22 +135,24 @@ onMounted(async () => {
           </div>
           <section class="fx-cartao">
             <h2 class="fx-secao-titulo">
-              Guia <span class="fx-mono">{{ numeroPreGuia(guiaAberta.id) }}</span> · {{ guiaAberta.beneficiario.nome }}
+              Guia <span class="fx-mono">{{ numeroGuia(guiaAberta.guiaId) }}</span> · {{ guiaAberta.beneficiarioNome }}
             </h2>
-            <p class="fx-suave">Emitida em {{ formatarData(guiaAberta.dataEmissao) }} · válida até {{ formatarData(guiaAberta.validoAte) }}</p>
-          </section>
-          <section v-for="p in guiaAberta.procedimentos" :key="p.atendimentoId" class="fx-cartao">
-            <h3 class="fx-secao-titulo">{{ p.nome }} <span class="fx-suave">· {{ p.ocs.nome }} · atendimento {{ p.atendimentoId }}</span></h3>
-            <LinhaDoTempo :eventos="historicosDaGuia[p.atendimentoId] || []" />
+            <p class="fx-suave">
+              Emitida em {{ formatarData(guiaAberta.dataEmissao) }} · {{ guiaAberta.qtdProcedimentos }} procedimento(s)
+            </p>
+            <LinhaDoTempo :linha-do-tempo="{ eventos: linhaDaGuia }" />
           </section>
         </template>
 
         <template v-else>
+          <p v-if="guiasSemId" class="fx-alerta fx-alerta-ambar">
+            {{ guiasSemId }} guia(s) emitida(s) sem identificador não aparecem na lista.
+          </p>
           <p v-if="guias.length === 0" class="fx-alerta fx-alerta-cinza">Nenhuma guia emitida.</p>
           <ul class="fx-lista">
-            <li v-for="g in guias" :key="g.id">
-              <button type="button" class="fx-cartao item" @click="abrirGuia(g.id)">
-                <span><strong class="fx-mono">{{ numeroPreGuia(g.id) }}</strong> · {{ g.beneficiarioNome }}</span>
+            <li v-for="g in guias" :key="g.guiaId">
+              <button type="button" class="fx-cartao item" @click="abrirGuia(g)">
+                <span><strong class="fx-mono">{{ numeroGuia(g.guiaId) }}</strong> · {{ g.beneficiarioNome }}</span>
                 <span class="fx-suave">
                   {{ g.qtdProcedimentos }} procedimento(s) · {{ formatarMoeda(g.valorTotal) }} · emitida em {{ formatarData(g.dataEmissao) }}
                 </span>
@@ -154,7 +174,7 @@ onMounted(async () => {
             <p v-if="espelhoAberto.motivoReprovacao" class="fx-alerta fx-alerta-vermelho">
               <strong>Motivo da reprovação:</strong> {{ espelhoAberto.motivoReprovacao }}
             </p>
-            <LinhaDoTempo :eventos="historicoEspelho" />
+            <LinhaDoTempo :linha-do-tempo="{ eventos: historicoEspelho }" />
           </section>
         </template>
 
@@ -166,7 +186,7 @@ onMounted(async () => {
                 <span><strong class="fx-mono">#{{ e.id }}</strong> · {{ e.ocsNome }}</span>
                 <span class="fx-suave">
                   {{ formatarData(e.dataInicio) }} a {{ formatarData(e.dataFim) }} · {{ e.quantidadeItens }} atendimento(s) ·
-                  {{ formatarMoeda(e.valorTotal) }} · {{ e.status }}
+                  {{ formatarMoeda(e.valorTotal) }} · {{ traduzirStatusHistorico(e.status) }}
                 </span>
               </button>
             </li>
