@@ -1,38 +1,72 @@
-# .
+# FUSEx — Frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+Interface web do sistema de gestão integrada de guias, atendimentos, espelhos e faturamento médico-hospitalar do **FUSEx (Fundo de Saúde do Exército)** em parceria com as Organizações Civis de Saúde (OCS/PSA), desenvolvido pelo time **DataSphere**.
 
-## Recommended IDE Setup
+Construído com **Vue 3**, **Vite** e **Pinia**.
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+---
 
-## Recommended Browser Setup
+## 📋 Pré-requisitos
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+- **Node.js**: versão `>= 22.18.0` (recomendado LTS)
+- **npm**: versão `>= 10`
 
-## Customize configuration
+---
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## ⚙️ Variáveis de Ambiente
 
-## Project Setup
+Copie o arquivo de exemplo para configurar o ambiente local:
 
-```sh
-npm install
+```bash
+cp .env.example .env
 ```
 
-### Compile and Hot-Reload for Development
+| Variável | Descrição | Padrão |
+| :--- | :--- | :--- |
+| `VITE_API_URL` | URL base da API backend (Spring Boot) | `http://localhost:8080` |
 
-```sh
+---
+
+## 🚀 Instalação e Execução
+
+### 1. Instalar as dependências
+
+```bash
+npm install
+# ou para instalação estrita
+npm ci
+```
+
+### 2. Rodar em modo de desenvolvimento
+
+```bash
 npm run dev
 ```
 
-### Compile and Minify for Production
+A aplicação ficará disponível em `http://localhost:5173`.
 
-```sh
+### 3. Build para produção
+
+```bash
 npm run build
 ```
+
+Os artefatos otimizados serão gerados no diretório `dist/`.
+
+---
+
+## 🐳 Executando com Docker
+
+### Build da imagem Docker
+
+```bash
+docker build --build-arg VITE_API_URL=http://localhost:8080 -t fusex-frontend .
+```
+
+### Executar o container
+
+```bash
+docker run -d -p 5173:80 --name fusex-frontend fusex-frontend
+```
+
+Acesse em `http://localhost:5173`.
