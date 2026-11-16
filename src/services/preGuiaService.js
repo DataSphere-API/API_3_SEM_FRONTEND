@@ -1,75 +1,137 @@
-import { api } from './http.js'
-import {
-  mockListarPreGuias,
-  mockBuscarPreGuia,
-  mockValidarPreGuia,
-  mockAprovarPreGuia,
-  mockReprovarPreGuia,
-  mockEmitirPreGuia
-  mockBaixarPacoteSire,
-  mockBaixarDocumentoConferencia
-} from '../mocks/preGuiaMock.js'
-import { traduzirErro } from '../utils/erros.js'
+const USAR_MOCK = true
 
-const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-
-export async function listarPreGuias() {
-  try {
-    if (USAR_MOCK) return await mockListarPreGuias()
-    const response = await api.get('/pre-guias')
-    return response.data
-  } catch (erro) {
-    throw traduzirErro(erro, { 404: 'Nenhuma pré-guia encontrada.' })
+export async function listarPreGuiasDoFluxo() {
+  if (USAR_MOCK) {
+    return [
+      { id: 1, beneficiarioNome: "Fulano de Tal", beneficiarioPrecCp: "100100100-00", status: "PRE_GUIA", valorTotal: 720.49, qtdProcedimentos: 1, dataCriacao: "2026-10-06" },
+      { id: 2, beneficiarioNome: "João Pedro Lima", beneficiarioPrecCp: "100100100-01", status: "COM_PENDENCIAS", valorTotal: 0.00, qtdProcedimentos: 1, dataCriacao: "2026-10-07" },
+      { id: 6, beneficiarioNome: "Fulano de Tal", beneficiarioPrecCp: "100100100-00", status: "EMITIDA", valorTotal: 990.49, qtdProcedimentos: 2, dataCriacao: "2026-10-11", dataEmissao: "2026-10-16" }
+    ]
   }
 }
 
-export async function buscarPreGuia(id) {
-  try {
-    if (USAR_MOCK) return await mockBuscarPreGuia(id)
-    const response = await api.get(`/pre-guias/${id}`)
-    return response.data
-  } catch (erro) {
-    throw traduzirErro(erro, { 404: 'Pré-guia não encontrada.' })
+export async function buscarPreGuiaDoFluxo(id) {
+  if (USAR_MOCK) {
+    const listaProcedimentos = [
+      {
+        id: 1,
+        procedimentoNome: "Raio-X",
+        nome: "Raio-X",
+        procedimento: { id: 1, nome: "Raio-X", codigo: "10101012" },
+        ocsNome: "Clínica Imagem Centro",
+        ocs: { id: 1, nome: "Clínica Imagem Centro" },
+        especialidade: { id: 1, nome: "Radiologia" },
+        quantidade: 1,
+        valorUnitario: 90.00,
+        valor: 90.00,
+        valorTotal: 90.00
+      }
+    ]
+
+    return {
+      id: Number(id),
+      numero: `PG 00${id}`,
+      beneficiarioNome: "Fulano de Tal",
+      beneficiarioPrecCp: "100100100-00",
+      beneficiario: { id: 1, nome: "Fulano de Tal", precCp: "100100100-00" },
+      status: Number(id) === 2 ? "COM_PENDENCIAS" : (Number(id) === 1 ? "PRE_GUIA" : "EMITIDA"),
+      valorTotal: 990.49,
+      dataCriacao: "2026-10-11",
+      dataEmissao: "2026-10-16",
+      medicoResponsavel: { id: 1, nome: "Rafael Duarte", crm: "123456" },
+      medico: { id: 1, nome: "Rafael Duarte", crm: "123456" },
+      especialidade: { id: 1, nome: "Ortopedia" },
+      ocs: { id: 1, nome: "Clínica Imagem Centro" },
+      medicoAprovou: true,
+      chefeAprovou: true,
+      validacao: {
+        validada: Number(id) !== 2,
+        pendencias: Number(id) === 2 ? [{ mensagem: "Procedimento sem contrato ativo com a OCS." }] : []
+      },
+      pendencias: Number(id) === 2 ? [{ mensagem: "Procedimento sem contrato ativo com a OCS." }] : [],
+      procedimentos: listaProcedimentos,
+      itens: listaProcedimentos
+    }
+  }
+}
+
+export async function enviarParaAprovacao(id) {
+  if (USAR_MOCK) {
+    return { validada: true, pendencias: [] }
   }
 }
 
 export async function validarPreGuia(id) {
-  try {
-    if (USAR_MOCK) return await mockValidarPreGuia(id)
-    const response = await api.post(`/pre-guias/${id}/validar`)
-    return response.data
-  } catch (erro) {
-    throw traduzirErro(erro, { 422: 'Não foi possível validar a pré-guia.' })
+  if (USAR_MOCK) {
+    return { validada: true, pendencias: [] }
+  }
+}
+
+export async function obterPacoteSire(id) {
+  if (USAR_MOCK) {
+    return { id, sistema: "SIRE", status: "EMITIDA", versao: "1.0" }
+  }
+}
+
+export async function obterDocumentoConferencia(id) {
+  if (USAR_MOCK) {
+    const dadosPreGuia = await buscarPreGuiaDoFluxo(id)
+    const textoPdf = `
+========================================
+SISTEMA FUSEX - DOCUMENTO DE CONFERÊNCIA
+========================================
+
+Pré-Guia: PG 00${dadosPreGuia.id}
+Status: ${dadosPreGuia.status}
+Data de Criação: ${dadosPreGuia.dataCriacao}
+
+--- BENEFICIÁRIO ---
+Nome: ${dadosPreGuia.beneficiarioNome}
+Prec-CP: ${dadosPreGuia.beneficiarioPrecCp}
+
+--- RESPONSÁVEL ---
+Médico: ${dadosPreGuia.medico.nome} (CRM: ${dadosPreGuia.medico.crm})
+
+--- PROCEDIMENTOS ---
+${dadosPreGuia.procedimentos.map(p => `- ${p.procedimentoNome || p.nome} | Qtd: ${p.quantidade} | Valor: R$ ${p.valorTotal}`).join('\n')}
+
+Valor Total: R$ ${dadosPreGuia.valorTotal}
+
+========================================
+Documento gerado automaticamente pelo sistema.
+    `.trim()
+
+    return new Blob([textoPdf], { type: 'application/pdf' })
+  }
+}
+
+export async function emitirGuia(id) {
+  if (USAR_MOCK) {
+    return { id, dataEmissao: "2026-10-16", validoAte: "2026-12-15" }
+  }
+}
+
+export async function criarPreGuia(dados) {
+  if (USAR_MOCK) {
+    return { id: 99, ...dados }
+  }
+}
+
+export async function editarPreGuia(id, dados) {
+  if (USAR_MOCK) {
+    return { id: Number(id), ...dados }
   }
 }
 
 export async function aprovarPreGuia(id) {
-  try {
-    if (USAR_MOCK) return await mockAprovarPreGuia(id)
-    const response = await api.patch(`/pre-guias/${id}/aprovar`)
-    return response.data
-  } catch (erro) {
-    throw traduzirErro(erro, { 422: 'Não foi possível aprovar a pré-guia.' })
+  if (USAR_MOCK) {
+    return { id: Number(id), status: "APROVADA" }
   }
 }
 
 export async function reprovarPreGuia(id, motivo) {
-  try {
-    if (USAR_MOCK) return await mockReprovarPreGuia(id, motivo)
-    const response = await api.patch(`/pre-guias/${id}/reprovar`, { motivo })
-    return response.data
-  } catch (erro) {
-    throw traduzirErro(erro, { 422: 'O motivo da reprovação é obrigatório.' })
-  }
-}
-
-export async function emitirPreGuia(id) {
-  try {
-    if (USAR_MOCK) return await mockEmitirPreGuia(id)
-    const response = await api.post(`/pre-guias/${id}/emitir`)
-    return response.data
-  } catch (erro) {
-    throw traduzirErro(erro, { 422: 'Não foi possível emitir a guia.' })
+  if (USAR_MOCK) {
+    return { id: Number(id), status: "REPROVADA", motivo }
   }
 }
 
