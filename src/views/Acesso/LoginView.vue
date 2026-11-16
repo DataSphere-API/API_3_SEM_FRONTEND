@@ -15,7 +15,7 @@ const carregando = ref(false)
 const erro = ref('')
 const errosCampo = ref({})
 
-const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+const MOSTRAR_USUARIOS_TESTE = import.meta.env.DEV
 const usuariosTeste = [
   { perfil: 'Chefe do FUSEx', cpf: '526.018.159-06' },
   { perfil: 'Médico', cpf: '083.016.613-05' },
@@ -118,8 +118,8 @@ async function entrar() {
         <router-link to="/cadastro">Cadastre-se</router-link>
       </p>
 
-      <details v-if="USAR_MOCK" class="teste">
-        <summary>Usuários de teste (modo mock)</summary>
+      <details v-if="MOSTRAR_USUARIOS_TESTE" class="teste">
+        <summary>Usuários de teste (desenvolvimento)</summary>
         <p class="fx-suave">
           Senha de todos: <span class="fx-mono">fusex123</span>. Militares da equipe também são beneficiários,
           então escolhem o perfil depois de entrar.
