@@ -8,7 +8,7 @@ export async function listarUsuarios() {
   try {
     if (USAR_MOCK) return await mockListarUsuarios()
     const response = await api.get('/usuarios')
-    return response.data
+    return response.data.usuarios
   } catch (erro) {
     throw traduzirErro(erro, { 403: 'Apenas o Chefe do FUSEx pode ver os usuários.' })
   }
@@ -28,7 +28,7 @@ export async function listarMedicos() {
   try {
     if (USAR_MOCK) return await mockListarMedicos()
     const response = await api.get('/medicos')
-    return response.data
+    return response.data.medicos
   } catch (erro) {
     throw traduzirErro(erro)
   }

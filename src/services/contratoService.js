@@ -13,7 +13,7 @@ export async function listarContratos() {
   try {
     if (USAR_MOCK) return await mockListarContratos()
     const response = await api.get('/contratos')
-    return response.data
+    return response.data.contratos
   } catch (erro) {
     throw traduzirErro(erro)
   }
@@ -33,7 +33,7 @@ export async function listarProcedimentos() {
   try {
     if (USAR_MOCK) return await mockListarProcedimentos()
     const response = await api.get('/procedimentos')
-    return response.data
+    return response.data.procedimentos
   } catch (erro) {
     throw traduzirErro(erro)
   }

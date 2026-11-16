@@ -8,7 +8,7 @@ export async function buscarBeneficiarios(busca) {
   try {
     if (USAR_MOCK) return await mockBuscarBeneficiarios(busca)
     const response = await api.get('/beneficiarios', { params: { busca } })
-    return response.data
+    return response.data.beneficiarios
   } catch (erro) {
     throw traduzirErro(erro)
   }
