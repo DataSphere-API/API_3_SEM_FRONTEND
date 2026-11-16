@@ -1,6 +1,8 @@
 <script setup>
 import { ref, watch } from 'vue'
 import QRCode from 'qrcode'
+import { api } from '../../../services/http.js'
+import LinhaDoTempo from '../../../components/LinhaDoTempo.vue'
 import { buscarQrCode } from '../../../services/guiasService.js'
 import {
   alertaValidade,
@@ -25,6 +27,8 @@ defineEmits(['fechar'])
 
 const qrs = ref({})
 const ampliado = ref(null)
+const linhaDoTempo = ref(null)
+const erroDoHistorico = ref('')
 
 async function carregarQr(guiaAtual, atendimentoId) {
   qrs.value = {
@@ -60,30 +64,41 @@ async function carregarQr(guiaAtual, atendimentoId) {
   }
 }
 
-// Validação por QR Code ficou fora do escopo da sprint (a baixa é pelo check mútuo).
-const QR_NO_ESCOPO = false
-
 function carregarQrs() {
   qrs.value = {}
   ampliado.value = null
 
-  if (!QR_NO_ESCOPO || !props.aberto || !props.guia) {
+  if (!props.aberto || !props.guia) {
     return
   }
 
   const guiaAtual = props.guia
 
   guiaAtual.procedimentos.forEach(proc => {
-    if (situacaoQr(guiaAtual, proc).exibir) {
+    if (situacao(proc).exibir) {
       carregarQr(guiaAtual, proc.atendimentoId)
     }
   })
 }
 
-watch([() => props.aberto, () => props.guia], carregarQrs, { immediate: true })
+watch([() => props.aberto, () => props.guia], async ([aberto, guia], anterior, cancelar) => {
+  carregarQrs()
+  linhaDoTempo.value = null
+  erroDoHistorico.value = ''
+  if (!aberto || !guia?.id) return
+
+  const controle = new AbortController()
+  cancelar(() => controle.abort())
+  try {
+    const { data } = await api.get(`/guias/${guia.id}/linha-do-tempo`, { signal: controle.signal })
+    linhaDoTempo.value = Array.isArray(data) ? { eventos: data } : data
+  } catch {
+    if (!controle.signal.aborted) erroDoHistorico.value = 'Histórico da guia indisponível.'
+  }
+}, { immediate: true })
 
 function situacao(proc) {
-  if (!QR_NO_ESCOPO) return { exibir: false, mensagem: '' }
+  if (proc.temQr === false) return { exibir: false, mensagem: 'QR Code indisponível para este procedimento.' }
   return situacaoQr(props.guia, proc)
 }
 
@@ -184,6 +199,8 @@ function baixar(proc) {
         <strong>{{ ampliado.titulo }}</strong>
         <img :src="ampliado.imagem" :alt="'QR Code ampliado de ' + ampliado.titulo" />
         <button type="button" class="fx-botao" @click="ampliado = null">Fechar</button>
+        <p v-if="erroDoHistorico" class="fx-suave">{{ erroDoHistorico }}</p>
+        <LinhaDoTempo v-else-if="linhaDoTempo" :linha-do-tempo="linhaDoTempo" />
       </div>
     </div>
   </div>

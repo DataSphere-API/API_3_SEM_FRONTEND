@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import GuiasLista from './components/GuiasLista.vue'
 import GuiaDetalhe from './components/GuiaDetalhe.vue'
-import { listarGuias, listarPreGuiasDoBeneficiario } from '../../services/guiasService.js'
+import { listarGuiasDoBeneficiario, listarPreGuiasDoBeneficiario } from '../../services/guiasService.js'
 import { sessao } from '../../stores/sessao.js'
 import { rotuloStatus, tomStatus } from '../../utils/guiaRegras.js'
 
@@ -23,7 +23,7 @@ async function buscar() {
   erros.value = []
   try {
     const [emitidas, solicitadas] = await Promise.allSettled([
-      listarGuias(precCp, { usarMock: false }),
+      listarGuiasDoBeneficiario(precCp),
       listarPreGuiasDoBeneficiario(precCp)
     ])
     guias.value = emitidas.status === 'fulfilled' ? emitidas.value : []

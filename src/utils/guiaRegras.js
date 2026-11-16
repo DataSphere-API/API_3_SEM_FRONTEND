@@ -45,6 +45,8 @@ const TONS_STATUS = {
 
 export function tomStatus(status) {
   const chave = semAcento(status)
+  if (chave.startsWith('EXPIRAD')) return 'vermelho'
+  if (chave.startsWith('REALIZAD')) return 'verde'
   return TONS_STATUS[chave] || (chave ? 'azul' : 'cinza')
 }
 
@@ -90,6 +92,15 @@ export function situacaoQr(guia, procedimento) {
 
   if (statusComecaCom(procedimento?.status, 'REALIZAD')) {
     return { exibir: false, mensagem: 'Procedimento já realizado: QR Code indisponível.' }
+  }
+
+  if (['APROVADA', 'LIQUIDADA'].includes(semAcento(procedimento?.statusPainel))
+    || statusComecaCom(procedimento?.statusPainel ?? procedimento?.status, 'FATURAD')) {
+    return { exibir: false, mensagem: 'Procedimento já faturado: QR Code indisponível.' }
+  }
+
+  if (statusComecaCom(guia?.status, 'FINALIZAD')) {
+    return { exibir: false, mensagem: 'Guia finalizada: QR Code indisponível.' }
   }
 
   if (statusComecaCom(procedimento?.status, 'EXPIRAD')) {

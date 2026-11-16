@@ -1,10 +1,34 @@
 import { api } from './http.js'
-import { mockBuscarQrCode } from '../mocks/guiasMock.js'
-import { mockListarGuiasDoBeneficiario } from '../mocks/checkMutuoMock.js'
 import { erroDeFormato, traduzirErro } from '../utils/erros.js'
 
-const USAR_MOCK = (import.meta.env.VITE_FONTE_GUIAS || 'mock') === 'mock'
-const USAR_MOCK_GUIAS = import.meta.env.VITE_USE_MOCK === 'true'
+const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+
+export async function listarGuias() {
+  try {
+    if (USAR_MOCK) {
+      return [
+        {
+          id: 1,
+          numero: 'G-2026-001',
+          beneficiario: 'João Pedro Lima',
+          status: 'EMITIDA',
+          dataEmissao: '2026-10-09'
+        },
+        {
+          id: 2,
+          numero: 'G-2026-002',
+          beneficiario: 'Ana Paula Souza',
+          status: 'EMITIDA',
+          dataEmissao: '2026-10-08'
+        }
+      ]
+    }
+    const response = await api.get('/guias')
+    return response.data
+  } catch (erro) {
+    throw traduzirErro(erro, { 404: 'Nenhuma guia encontrada.' })
+  }
+}
 
 function normalizarProcedimento(procedimento) {
   const dados = procedimento && typeof procedimento === 'object' ? procedimento : {}
@@ -13,6 +37,7 @@ function normalizarProcedimento(procedimento) {
     // #64 manda "nome"; o mock antigo mandava "descricao".
     descricao: dados.procedimento ?? dados.nome ?? dados.descricao ?? 'Procedimento',
     status: dados.status ?? '',
+    temQr: dados.temQr,
     statusPainel: dados.statusPainel ?? dados.status ?? '',
     qtdRealizada: dados.sessoesFeitas ?? dados.qtdRealizada,
     qtdAutorizada: dados.sessoesAutorizadas ?? dados.qtdAutorizada
@@ -45,17 +70,12 @@ export function normalizarQrCode(dados) {
   return { codigo: codigo.trim() }
 }
 
-export async function listarGuias(precCp, { usarMock = USAR_MOCK_GUIAS } = {}) {
+export async function listarGuiasDoBeneficiario(precCp) {
   try {
-    const dados = usarMock
-        ? await mockListarGuiasDoBeneficiario(precCp)
-        : (await api.get(`/beneficiarios/${encodeURIComponent(precCp)}/guias`)).data
-    return normalizarGuias(dados)
+    const { data } = await api.get(`/beneficiarios/${encodeURIComponent(precCp)}/guias`)
+    return normalizarGuias(data)
   } catch (erro) {
-    throw traduzirErro(erro, {
-      404: 'Nenhuma guia encontrada para este PrecCP.',
-      padrao: 'Não foi possível carregar as guias.'
-    })
+    throw traduzirErro(erro, { 403: 'Você não tem acesso a essas guias.' })
   }
 }
 
@@ -72,14 +92,9 @@ export async function listarPreGuiasDoBeneficiario(precCp) {
 
 export async function buscarQrCode(atendimentoId) {
   try {
-    const dados = USAR_MOCK
-        ? await mockBuscarQrCode(atendimentoId)
-        : (await api.get(`/atendimentos/${atendimentoId}/qrcode`)).data
-    return normalizarQrCode(dados)
+    const { data } = await api.get(`/atendimentos/${encodeURIComponent(atendimentoId)}/qrcode`)
+    return normalizarQrCode(data)
   } catch (erro) {
-    throw traduzirErro(erro, {
-      404: 'QR Code não encontrado para este procedimento.',
-      padrao: 'Não foi possível carregar o QR Code.'
-    })
+    throw traduzirErro(erro, { 404: 'QR Code não encontrado para este procedimento.' })
   }
 }
