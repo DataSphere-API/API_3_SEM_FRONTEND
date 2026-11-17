@@ -1,7 +1,6 @@
 <script setup>
 import {
   alertaValidade,
-  guiaExpirada,
   rotuloStatus,
   tomStatus
 } from '../../../utils/guiaRegras.js'
@@ -13,13 +12,7 @@ defineProps({
   }
 })
 
-defineEmits(['abrir-detalhe', 'abrir-qrcode'])
-
-function temSessoesPendentes(proc) {
-  const realizada = Number(proc.qtdRealizada || 0)
-  const autorizada = Number(proc.qtdAutorizada || 0)
-  return realizada < autorizada
-}
+defineEmits(['abrir-guia'])
 
 function procedimentoConcluido(proc) {
   const realizada = Number(proc.qtdRealizada || 0)
@@ -58,24 +51,16 @@ function procedimentoConcluido(proc) {
             </span>
           </div>
 
-          <div class="proc-acoes">
-            <button
-              v-if="temSessoesPendentes(proc) && !guiaExpirada(guia)"
-              type="button"
-              class="btn-acao-mini"
-              @click="$emit('abrir-qrcode', { guia, procedimento: proc })"
-            >
-              Ver QR Code
-            </button>
-            <span v-else-if="procedimentoConcluido(proc)" class="fx-selo fx-selo-cinza">Concluído</span>
-          </div>
+          <span v-if="proc.statusPainel" class="fx-selo" :class="'fx-selo-' + tomStatus(proc.statusPainel)">
+            {{ rotuloStatus(proc.statusPainel) }}
+          </span>
         </div>
       </div>
 
       <button
         type="button"
         class="fx-botao"
-        @click="$emit('abrir-detalhe', guia)"
+        @click="$emit('abrir-guia', guia)"
       >
         Ver detalhes
       </button>

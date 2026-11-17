@@ -1,78 +1,45 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import GuiasLista from './components/GuiasLista.vue'
 import GuiaDetalhe from './components/GuiaDetalhe.vue'
-import { listarGuias } from '../../services/guiasService.js'
+import { listarGuiasDoBeneficiario, listarPreGuiasDoBeneficiario } from '../../services/guiasService.js'
 import { sessao } from '../../stores/sessao.js'
+import { rotuloStatus, tomStatus } from '../../utils/guiaRegras.js'
 
-const precCpDoLogin = sessao.usuario?.precCp || ''
-const precCp = ref(precCpDoLogin)
 const guias = ref([])
+const preGuias = ref([])
 const carregando = ref(false)
-const erro = ref('')
-const consultou = ref(false)
-
-const procedimentoSelecionadoModal = ref(null)
-const guiaDetalhesModal = ref(null)
-const urlQrCodeAtual = ref('')
-
-let sequencia = 0
+const erros = ref([])
+const guiaSelecionada = ref(null)
 
 async function buscar() {
-  const valor = precCp.value.trim()
-
-  if (!valor) {
-    erro.value = 'Informe o PrecCP do beneficiário.'
+  const precCp = sessao.usuario?.precCp
+  if (!precCp) {
+    erros.value = ['O Prec-CP do beneficiário não está disponível na sessão.']
     return
   }
 
-  const minhaSequencia = ++sequencia
-
   carregando.value = true
-  erro.value = ''
-  guias.value = []
-  guiaSelecionada.value = null
-
+  erros.value = []
   try {
-    const lista = await listarGuias(valor)
-
-    if (minhaSequencia === sequencia) {
-      guias.value = lista
-      consultou.value = true
+    const [emitidas, solicitadas] = await Promise.allSettled([
+      listarGuiasDoBeneficiario(precCp),
+      listarPreGuiasDoBeneficiario(precCp)
+    ])
+    guias.value = emitidas.status === 'fulfilled' ? emitidas.value : []
+    preGuias.value = solicitadas.status === 'fulfilled' ? solicitadas.value : []
+    if (emitidas.status === 'rejected') {
+      erros.value.push(emitidas.reason?.mensagemUsuario || 'Não foi possível carregar as guias.')
     }
-  } catch (e) {
-    if (minhaSequencia === sequencia) {
-      erro.value = e.mensagemUsuario || 'Não foi possível carregar as guias.'
-      consultou.value = false
+    if (solicitadas.status === 'rejected') {
+      erros.value.push(solicitadas.reason?.mensagemUsuario || 'Não foi possível carregar as solicitações.')
     }
   } finally {
-    if (minhaSequencia === sequencia) {
-      carregando.value = false
-    }
+    carregando.value = false
   }
 }
 
-function lidarBaixarQr(procedimento) {
-}
-
-function tratarAbrirQrCode({ guia, procedimento }) {
-  procedimentoSelecionadoModal.value = {
-    ...procedimento,
-    atendimentoId: guia.atendimentoId || procedimento.atendimentoId || guia.id,
-    codigoManual: procedimento.codigoManual || procedimento.atendimentoId || 'FUSEX-' + (procedimento.atendimentoId || '000')
-  }
-
-  const dadosQr = procedimentoSelecionadoModal.value.codigoManual
-  urlQrCodeAtual.value = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${dadosQr}`
-}
-
-function tratarAbrirDetalhes(guia) {
-  guiaDetalhesModal.value = guia
-}
-
-onMounted(() => {
-  if (precCpDoLogin) buscar()
-})
+onMounted(buscar)
 </script>
 
 <template>
@@ -80,167 +47,53 @@ onMounted(() => {
     <div class="fx-conteudo">
       <header>
         <h1 class="fx-titulo">Minhas guias</h1>
-        <p class="fx-subtitulo">
-          Acompanhe o status das guias e consulte os QR Codes para atendimento na clínica.
-        </p>
+        <p class="fx-subtitulo">Acompanhe o status das guias e o progresso de cada procedimento.</p>
       </header>
-
-      <form v-if="!precCpDoLogin" class="fx-cartao busca" @submit.prevent="buscar">
-        <label class="fx-campo">
-          PrecCP do beneficiário
-          <input
-            v-model="precCp"
-            type="text"
-            class="fx-entrada"
-            placeholder="Ex.: 100100100-00"
-            autocomplete="off"
-          />
-        </label>
-
-        <button type="submit" class="fx-botao" :disabled="carregando">
-          Buscar guias
-        </button>
-      </form>
 
       <p v-if="carregando" class="fx-alerta fx-alerta-cinza" role="status">
         Carregando guias...
       </p>
 
-      <div v-else-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">
-        <p class="mensagem-erro">{{ erro }}</p>
-        <button type="button" class="fx-botao-secundario" @click="buscar">
-          Tentar novamente
-        </button>
-      </div>
+      <template v-else>
+        <div v-if="erros.length" class="fx-alerta fx-alerta-vermelho" role="alert">
+          <p v-for="(erro, indice) in erros" :key="indice">{{ erro }}</p>
+          <button type="button" class="fx-botao-secundario" @click="buscar">Tentar novamente</button>
+        </div>
 
-      <p v-else-if="consultou && guias.length === 0" class="fx-alerta fx-alerta-cinza">
-        Nenhuma guia encontrada para este beneficiário.
-      </p>
+        <section v-if="preGuias.length" aria-labelledby="solicitacoes">
+          <h2 id="solicitacoes" class="fx-secao-titulo">Solicitações</h2>
+          <ul class="fx-lista">
+            <li v-for="(preGuia, indice) in preGuias" :key="preGuia.preGuiaId ?? preGuia.id ?? indice" class="fx-cartao">
+              <div class="solicitacao-topo">
+                <span>Pré-guia {{ preGuia.numero || preGuia.preGuiaId || preGuia.id || '' }}</span>
+                <span class="fx-selo" :class="'fx-selo-' + tomStatus('SOLICITADA')">
+                  {{ rotuloStatus('SOLICITADA') }}
+                </span>
+              </div>
+            </li>
+          </ul>
+        </section>
 
-      <GuiasLista
-        v-else-if="guias.length > 0"
-        :guias="guias"
-        @abrir-qrcode="tratarAbrirQrCode"
-        @abrir-detalhe="tratarAbrirDetalhes"
-      />
+        <GuiasLista v-if="guias.length" :guias="guias" @abrir-guia="guiaSelecionada = $event" />
+        <p v-else-if="!erros.length && !preGuias.length" class="fx-alerta fx-alerta-cinza">
+          Nenhuma guia ou solicitação encontrada para este beneficiário.
+        </p>
+      </template>
     </div>
 
-    <!-- Componente de Modal de Detalhe / QR Code integrado corretamente com a URL -->
     <GuiaDetalhe
-      :visivel="Boolean(procedimentoSelecionadoModal)"
-      :procedimento="procedimentoSelecionadoModal"
-      :url-qr-code="urlQrCodeAtual"
-      @baixar="lidarBaixarQr"
-      @fechar="procedimentoSelecionadoModal = null"
+      :aberto="guiaSelecionada !== null"
+      :guia="guiaSelecionada"
+      @fechar="guiaSelecionada = null"
     />
-
-    <div v-if="guiaDetalhesModal" class="modal-overlay" @click="guiaDetalhesModal = null">
-      <div class="modal-conteudo-guia" @click.stop>
-        <div class="modal-cabecalho">
-          <h3>Detalhes da Guia: {{ guiaDetalhesModal.numero || 'Sem número' }}</h3>
-          <button type="button" class="btn-fechar-topo" @click="guiaDetalhesModal = null">✕</button>
-        </div>
-
-        <p class="fx-suave status-modal">Status da Guia: {{ guiaDetalhesModal.status }}</p>
-
-        <div class="lista-procedimentos-modal">
-          <div v-for="(proc, i) in guiaDetalhesModal.procedimentos" :key="i" class="detalhe-proc-item">
-            <strong>{{ proc.descricao || proc.nome }}</strong>
-            <p class="fx-suave">Sessões: {{ proc.qtdRealizada || 0 }} / {{ proc.qtdAutorizada || 0 }}</p>
-          </div>
-        </div>
-
-        <button type="button" class="fx-botao btn-fechar-inferior" @click="guiaDetalhesModal = null">
-          Fechar
-        </button>
-      </div>
-    </div>
   </main>
 </template>
 
 <style scoped>
-.busca {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: flex-end;
-}
-
-.mensagem-erro {
-  margin: 0 0 0.6rem;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.modal-conteudo-guia {
-  background: #ffffff;
-  padding: 1.5rem;
-  border-radius: 12px;
-  width: 450px;
-  max-width: 90%;
-  max-height: 85vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-}
-
-.modal-cabecalho {
+.solicitacao-topo {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 0.5rem;
-}
-
-.modal-cabecalho h3 {
-  margin: 0;
-  color: var(--fx-verde, #1e4d36);
-}
-
-.btn-fechar-topo {
-  background: transparent;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-  color: #666;
-}
-
-.status-modal {
-  margin: 0;
-  font-size: 0.85rem;
-}
-
-.lista-procedimentos-modal {
-  display: flex;
-  flex-direction: column;
   gap: 0.75rem;
-}
-
-.detalhe-proc-item {
-  padding: 0.5rem;
-  background: #f9f9f9;
-  border-radius: 6px;
-  border: 1px solid #eee;
-}
-
-.detalhe-proc-item p {
-  margin: 0.2rem 0 0 0;
-}
-
-.btn-fechar-inferior {
-  margin-top: 0.5rem;
-  background-color: #4a5568 !important;
 }
 </style>
