@@ -8,7 +8,7 @@ export async function listarOcs() {
   try {
     if (USAR_MOCK) return await mockListarOcs()
     const response = await api.get('/ocs')
-    return response.data
+    return response.data.ocs
   } catch (erro) {
     throw traduzirErro(erro)
   }
