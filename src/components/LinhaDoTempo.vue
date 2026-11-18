@@ -45,7 +45,10 @@ defineProps({
 
           <p v-if="e.descricao" class="descricao">{{ e.descricao }}</p>
 
-          <div class="fx-suave meta">{{ formatarDataHora(e.data) }} · {{ traduzirOrigemHistorico(e.origem) }}</div>
+          <div class="fx-suave meta">
+            {{ formatarDataHora(e.data) }} · {{ traduzirOrigemHistorico(e.origem) }}
+            <template v-if="e.usuarioNome"> · por {{ e.usuarioNome }}</template>
+          </div>
         </div>
       </li>
     </ol>
