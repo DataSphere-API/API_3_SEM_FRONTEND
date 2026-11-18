@@ -35,7 +35,7 @@ async function carregar() {
     erroEspelhos.value = ''
     const [listaPreGuias, listaEspelhos] = await Promise.allSettled([
       api.get('/pre-guias', { params: { status: 'EMITIDA' } }),
-      listarEspelhos({}, { usarMock: false })
+      listarEspelhos({})
     ])
     if (listaPreGuias.status === 'fulfilled') {
       const preGuias = listaPreGuias.value.data
