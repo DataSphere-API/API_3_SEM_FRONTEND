@@ -1,40 +1,11 @@
 import { api } from './http.js'
 import { erroDeFormato, traduzirErro } from '../utils/erros.js'
 
-const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-
-export async function listarGuias() {
-  try {
-    if (USAR_MOCK) {
-      return [
-        {
-          id: 1,
-          numero: 'G-2026-001',
-          beneficiario: 'João Pedro Lima',
-          status: 'EMITIDA',
-          dataEmissao: '2026-10-09'
-        },
-        {
-          id: 2,
-          numero: 'G-2026-002',
-          beneficiario: 'Ana Paula Souza',
-          status: 'EMITIDA',
-          dataEmissao: '2026-10-08'
-        }
-      ]
-    }
-    const response = await api.get('/guias')
-    return response.data
-  } catch (erro) {
-    throw traduzirErro(erro, { 404: 'Nenhuma guia encontrada.' })
-  }
-}
-
 function normalizarProcedimento(procedimento) {
   const dados = procedimento && typeof procedimento === 'object' ? procedimento : {}
   return {
     atendimentoId: dados.atendimentoId ?? dados.id ?? null,
-    // #64 manda "nome"; o mock antigo mandava "descricao".
+    // O back manda "procedimento" ou "nome".
     descricao: dados.procedimento ?? dados.nome ?? dados.descricao ?? 'Procedimento',
     status: dados.status ?? '',
     temQr: dados.temQr,

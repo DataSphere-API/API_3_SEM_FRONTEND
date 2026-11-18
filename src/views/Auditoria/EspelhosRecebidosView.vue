@@ -48,7 +48,7 @@ async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    espelhos.value = (await listarEspelhos({}, { usarMock: false })).sort((a, b) => b.id - a.id)
+    espelhos.value = (await listarEspelhos({})).sort((a, b) => b.id - a.id)
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar os espelhos.'
   } finally {
@@ -63,7 +63,7 @@ async function abrir(espelho) {
   motivo.value = ''
   reprovando.value = false
   try {
-    itens.value = await listarItensEspelho(espelho.id, { usarMock: false })
+    itens.value = await listarItensEspelho(espelho.id)
     selecionado.value = espelho
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível abrir o espelho.'
