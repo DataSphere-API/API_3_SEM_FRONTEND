@@ -8,17 +8,14 @@ import {
   buscarPreGuiaDoFluxo,
   criarPreGuia,
   editarPreGuia,
-  enviarParaAprovacao,
-  aprovarPreGuia
+  enviarParaAprovacao
 } from '../../services/fluxoPreGuiaService.js'
-import { sessao } from '../../stores/sessao.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { EDITAVEIS, numeroPreGuia } from '../../utils/fluxoPreGuia.js'
 
 const route = useRoute()
 const router = useRouter()
 
-const ehMedico = sessao.perfilAtivo === 'MEDICO'
 const idEdicao = route.name === 'editar-pre-guia' ? Number(route.params.id) : null
 
 const contratos = ref([])
@@ -37,13 +34,13 @@ const resultadosBusca = ref([])
 const beneficiario = ref(null)
 
 const form = reactive({
-  medicoId: ehMedico ? sessao.usuario.id : '',
+  medicoId: '',
   itens: [{ contratoId: '', quantidade: 1 }]
 })
 
 const titulo = computed(() => {
   if (idEdicao) return `Editar pré-guia ${numeroPreGuia(idEdicao)}`
-  return ehMedico ? 'Nova solicitação de exame' : 'Criar pré-guia'
+  return 'Criar pré-guia'
 })
 
 function contratoDe(item) {
@@ -58,7 +55,7 @@ async function carregar() {
   carregando.value = true
   erroCarga.value = ''
   try {
-    const [listaContratos, listaMedicos] = await Promise.all([listarContratos(), ehMedico ? [] : listarMedicos()])
+    const [listaContratos, listaMedicos] = await Promise.all([listarContratos(), listarMedicos()])
     contratos.value = listaContratos
     medicos.value = listaMedicos
     if (idEdicao) {
@@ -131,7 +128,7 @@ function corpo() {
   }
 }
 
-// enviar = false só salva (fica PRE_GUIA); enviar = true também valida (US006) e, se for o médico, já aprova.
+// enviar = false só salva (fica PRE_GUIA); enviar = true também valida e manda para aprovação.
 async function salvar(enviar) {
   erro.value = ''
   if (!validar()) return
@@ -145,15 +142,10 @@ async function salvar(enviar) {
     }
     const validacao = await enviarParaAprovacao(salva.id)
     if (!validacao.validada) {
-      if (ehMedico) {
-        resultado.value = { id: salva.id, pendencias: validacao.pendencias }
-      } else {
-        // Abre a edição já com as pendências que a validação apontou.
-        router.replace({ name: 'editar-pre-guia', params: { id: salva.id }, query: { pendente: 1 } })
-      }
+      // Abre a edição já com as pendências que a validação apontou.
+      router.replace({ name: 'editar-pre-guia', params: { id: salva.id }, query: { pendente: 1 } })
       return
     }
-    if (ehMedico) await aprovarPreGuia(salva.id)
     resultado.value = { id: salva.id, pendencias: [] }
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível salvar a pré-guia.'
@@ -166,7 +158,7 @@ function novaSolicitacao() {
   resultado.value = null
   beneficiario.value = null
   form.itens = [{ contratoId: '', quantidade: 1 }]
-  if (!ehMedico) form.medicoId = ''
+  form.medicoId = ''
 }
 
 onMounted(carregar)
@@ -178,8 +170,7 @@ onMounted(carregar)
       <header>
         <h1 class="fx-titulo">{{ titulo }}</h1>
         <p class="fx-subtitulo">
-          <template v-if="ehMedico">Ao enviar, sua aprovação já fica registrada. Falta só a do Chefe do FUSEx.</template>
-          <template v-else>Ao enviar, o sistema valida a pré-guia e ela vai para o Médico e para o Chefe do FUSEx.</template>
+          Ao enviar, o sistema valida a pré-guia e ela segue para aprovação.
         </p>
       </header>
 
@@ -199,8 +190,7 @@ onMounted(carregar)
         </div>
         <div class="fx-acoes">
           <button type="button" class="fx-botao" @click="novaSolicitacao">Criar outra</button>
-          <router-link v-if="ehMedico" to="/medico/aprovacao" class="fx-botao-secundario link-botao">Ir para as aprovações</router-link>
-          <router-link v-else to="/emissor/acompanhamento" class="fx-botao-secundario link-botao">Ir para o acompanhamento</router-link>
+          <router-link to="/emissor/acompanhamento" class="fx-botao-secundario link-botao">Ir para o acompanhamento</router-link>
         </div>
       </section>
 
@@ -253,10 +243,7 @@ onMounted(carregar)
 
         <section class="fx-cartao">
           <h2 class="fx-secao-titulo">2. Médico responsável</h2>
-          <p v-if="ehMedico" class="escolhido">
-            <span><strong>{{ sessao.usuario.nome }}</strong> <span class="fx-suave fx-mono">· CRM {{ sessao.usuario.crm }}</span></span>
-          </p>
-          <label v-else class="fx-campo">
+          <label class="fx-campo">
             Médico que vai aprovar a pré-guia
             <select v-model="form.medicoId" class="fx-entrada" :class="{ 'fx-entrada-erro': errosCampo.medico }">
               <option value="" disabled>Escolha o médico</option>
@@ -303,7 +290,7 @@ onMounted(carregar)
           <button type="submit" class="fx-botao" :disabled="salvando">
             {{ salvando ? 'Enviando...' : 'Enviar para aprovação' }}
           </button>
-          <button v-if="!ehMedico" type="button" class="fx-botao-secundario" :disabled="salvando" @click="salvar(false)">
+          <button type="button" class="fx-botao-secundario" :disabled="salvando" @click="salvar(false)">
             Salvar rascunho
           </button>
         </div>
