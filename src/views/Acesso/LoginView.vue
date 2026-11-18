@@ -18,10 +18,13 @@ const errosCampo = ref({})
 const MOSTRAR_USUARIOS_TESTE = import.meta.env.DEV
 const usuariosTeste = [
   { perfil: 'Chefe do FUSEx', cpf: '526.018.159-06' },
-  { perfil: 'Médico', cpf: '083.016.613-05' },
+  { perfil: 'Médico (médico 1)', cpf: '083.016.613-05' },
+  { perfil: 'Médico (médico 2)', cpf: '731.406.285-44' },
   { perfil: 'Emissor', cpf: '186.091.390-34' },
   { perfil: 'Auditor', cpf: '996.030.824-30' },
-  { perfil: 'OCS', cpf: '628.194.821-12' },
+  { perfil: 'OCS · Clínica X', cpf: '628.194.821-12' },
+  { perfil: 'OCS · Hospital Y', cpf: '450.918.362-33' },
+  { perfil: 'OCS · Laboratório Z', cpf: '286.753.104-71' },
   { perfil: 'Beneficiário', cpf: '993.518.190-19' }
 ]
 
