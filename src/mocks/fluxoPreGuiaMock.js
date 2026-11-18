@@ -171,7 +171,7 @@ export async function mockEditarPreGuia(id, dados) {
   await esperar(400)
   const preGuia = encontrar(id)
   if (!EDITAVEIS.includes(preGuia.status)) {
-    throw erroHttp(409, { codigo: 'PRE_GUIA_STATUS_INVALIDO', mensagem: 'Só dá para editar antes da validação ou com pendências.' })
+    throw erroHttp(409, { codigo: 'PRE_GUIA_STATUS_INVALIDO', mensagem: 'Só dá para editar antes da validação, com pendências ou reprovada.' })
   }
   conferirCorpo(dados)
   Object.assign(preGuia, {
@@ -179,7 +179,9 @@ export async function mockEditarPreGuia(id, dados) {
     medicoId: dados.medicoId,
     procedimentos: montarProcedimentos(dados.procedimentos),
     status: 'PRE_GUIA',
-    pendencias: []
+    pendencias: [],
+    dataAprovacaoMedico: null,
+    dataAprovacaoChefe: null
   })
   persistir()
   return detalhe(preGuia)
@@ -220,9 +222,15 @@ export async function mockAprovarPreGuia(id) {
   if (preGuia[campo]) {
     throw erroHttp(409, { codigo: 'APROVACAO_JA_REGISTRADA', mensagem: 'Você já aprovou esta pré-guia.' })
   }
+  if (campo === 'dataAprovacaoChefe' && !preGuia.dataAprovacaoMedico) {
+    throw erroHttp(409, { codigo: 'APROVACAO_MEDICO_PENDENTE', mensagem: 'A pré-guia precisa ser aprovada pelo médico antes do chefe.' })
+  }
   preGuia[campo] = new Date().toISOString()
   if (campo === 'dataAprovacaoChefe') preGuia.chefeId = sessao.usuario?.id
-  if (preGuia.dataAprovacaoMedico && preGuia.dataAprovacaoChefe) preGuia.status = 'APROVADA'
+  if (preGuia.dataAprovacaoMedico && preGuia.dataAprovacaoChefe) {
+    preGuia.status = 'APROVADA'
+    preGuia.motivoReprovacao = null
+  }
   persistir()
   return {
     preGuiaId: preGuia.id,

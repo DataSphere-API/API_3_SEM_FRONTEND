@@ -16,7 +16,7 @@ const emit = defineEmits(['fechar', 'editar', 'enviar', 'emitir', 'atualizar'])
 
 function permiteEditarOuEnviar(preGuia) {
   const status = (preGuia?.status || preGuia?.situacao || '').toUpperCase().trim()
-  return ['RASCUNHO', 'PRE_GUIA', 'COM_PENDENCIAS', 'COM PENDÊNCIAS'].includes(status)
+  return ['RASCUNHO', 'PRE_GUIA', 'COM_PENDENCIAS', 'COM PENDÊNCIAS', 'REPROVADA'].includes(status)
 }
 
 function permiteEmitir(preGuia) {
@@ -35,6 +35,9 @@ function permiteEmitir(preGuia) {
     <p><strong>Número:</strong> {{ preGuia.numero }}</p>
     <p><strong>Beneficiário:</strong> {{ preGuia.beneficiario?.nome || preGuia.beneficiarioNome || preGuia.beneficiario }}</p>
     <p><strong>Situação:</strong> {{ preGuia.status || preGuia.situacao }}</p>
+    <p v-if="preGuia.motivoReprovacao" class="fx-alerta fx-alerta-vermelho">
+      <strong>Motivo da reprovação:</strong> {{ preGuia.motivoReprovacao }}
+    </p>
 
     <PainelValidacaoPreGuia
       :pre-guia="preGuia"

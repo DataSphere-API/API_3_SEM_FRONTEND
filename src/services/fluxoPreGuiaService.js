@@ -6,10 +6,13 @@ const API_URL = "http://localhost:8080/api"
 export async function listarPreGuiasDoFluxo() {
   if (USAR_MOCK) {
     return [
-      { id: 1, beneficiarioNome: "Fulano de Tal", beneficiarioPrecCp: "100100100-00", status: "PRE_GUIA", valorTotal: 720.49, qtdProcedimentos: 1, dataCriacao: "2026-10-06" },
-      { id: 2, beneficiarioNome: "João Pedro Lima", beneficiarioPrecCp: "100100100-01", status: "COM_PENDENCIAS", valorTotal: 0.00, qtdProcedimentos: 1, dataCriacao: "2026-10-07" },
-      { id: 5, beneficiarioNome: "Maria Clara Souza", beneficiarioPrecCp: "100100100-05", status: "APROVADA", valorTotal: 450.00, qtdProcedimentos: 1, dataCriacao: "2026-10-10" },
-      { id: 6, beneficiarioNome: "Fulano de Tal", beneficiarioPrecCp: "100100100-00", status: "EMITIDA", valorTotal: 990.49, qtdProcedimentos: 2, dataCriacao: "2026-10-11", dataEmissao: "2026-10-16" }
+      { id: 1, beneficiarioNome: "Fulano de Tal", beneficiarioPrecCp: "100100100-00", status: "PRE_GUIA", valorTotal: 720.49, qtdProcedimentos: 1, dataCriacao: "2026-10-06", medicoAprovou: false, chefeAprovou: false },
+      { id: 2, beneficiarioNome: "João Pedro Lima", beneficiarioPrecCp: "100100100-01", status: "COM_PENDENCIAS", valorTotal: 0.00, qtdProcedimentos: 1, dataCriacao: "2026-10-07", medicoAprovou: false, chefeAprovou: false },
+      { id: 3, beneficiarioNome: "Carlos Eduardo", beneficiarioPrecCp: "123456789-00", status: "VALIDADA", valorTotal: 300.00, qtdProcedimentos: 1, dataCriacao: "2026-10-08", medicoAprovou: false, chefeAprovou: false },
+      { id: 4, beneficiarioNome: "João Pedro Lima", beneficiarioPrecCp: "100100100-01", status: "VALIDADA", valorTotal: 500.00, qtdProcedimentos: 1, dataCriacao: "2026-10-09", medicoAprovou: true, chefeAprovou: false, dataAprovacaoMedico: "2026-10-09T10:00:00" },
+      { id: 5, beneficiarioNome: "Maria Clara Souza", beneficiarioPrecCp: "100100100-05", status: "APROVADA", valorTotal: 450.00, qtdProcedimentos: 1, dataCriacao: "2026-10-10", medicoAprovou: true, chefeAprovou: true, dataAprovacaoMedico: "2026-10-10T09:00:00", dataAprovacaoChefe: "2026-10-10T11:00:00" },
+      { id: 6, beneficiarioNome: "Fulano de Tal", beneficiarioPrecCp: "100100100-00", status: "EMITIDA", valorTotal: 990.49, qtdProcedimentos: 2, dataCriacao: "2026-10-11", dataEmissao: "2026-10-16", medicoAprovou: true, chefeAprovou: true },
+      { id: 8, beneficiarioNome: "Carlos Eduardo", beneficiarioPrecCp: "123456789-00", status: "REPROVADA", valorTotal: 250.00, qtdProcedimentos: 1, dataCriacao: "2026-10-12", motivoReprovacao: "Procedimento sem indicação clínica no pedido." }
     ]
   }
   const response = await fetch(API_URL + "/pre-guias")
@@ -20,7 +23,7 @@ export async function listarPreGuiasDoFluxo() {
 export async function buscarPreGuiaDoFluxo(id) {
   if (USAR_MOCK) {
     const numId = Number(id)
-    const statusAtual = numId === 2 ? "COM_PENDENCIAS" : (numId === 5 ? "APROVADA" : (numId === 1 ? "PRE_GUIA" : "EMITIDA"))
+    const statusAtual = numId === 8 ? "REPROVADA" : (numId === 2 ? "COM_PENDENCIAS" : (numId === 4 ? "VALIDADA" : (numId === 3 ? "VALIDADA" : (numId === 5 ? "APROVADA" : (numId === 1 ? "PRE_GUIA" : "EMITIDA")))))
 
     const listaProcedimentos = [
       {
@@ -41,9 +44,13 @@ export async function buscarPreGuiaDoFluxo(id) {
     return {
       id: numId,
       numero: "PG 00" + numId,
-      beneficiarioNome: numId === 5 ? "Maria Clara Souza" : "Fulano de Tal",
-      beneficiarioPrecCp: numId === 5 ? "100100100-05" : "100100100-00",
-      beneficiario: { id: numId, nome: numId === 5 ? "Maria Clara Souza" : "Fulano de Tal", precCp: "100100100-00" },
+      beneficiarioNome: numId === 5 ? "Maria Clara Souza" : (numId === 3 || numId === 8 ? "Carlos Eduardo" : (numId === 2 || numId === 4 ? "João Pedro Lima" : "Fulano de Tal")),
+      beneficiarioPrecCp: numId === 5 ? "100100100-05" : (numId === 3 || numId === 8 ? "123456789-00" : (numId === 2 || numId === 4 ? "100100100-01" : "100100100-00")),
+      beneficiario: {
+        id: numId,
+        nome: numId === 5 ? "Maria Clara Souza" : (numId === 3 || numId === 8 ? "Carlos Eduardo" : (numId === 2 || numId === 4 ? "João Pedro Lima" : "Fulano de Tal")),
+        precCp: numId === 5 ? "100100100-05" : (numId === 3 || numId === 8 ? "123456789-00" : (numId === 2 || numId === 4 ? "100100100-01" : "100100100-00"))
+      },
       status: statusAtual,
       valorTotal: numId === 5 ? 450.00 : 990.49,
       dataCriacao: "2026-10-11",
@@ -52,8 +59,11 @@ export async function buscarPreGuiaDoFluxo(id) {
       medico: { id: 1, nome: "Rafael Duarte", crm: "123456" },
       especialidade: { id: 1, nome: "Ortopedia" },
       ocs: { id: 1, nome: "Clínica Imagem Centro" },
-      medicoAprovou: true,
-      chefeAprovou: true,
+      medicoAprovou: numId === 4 || numId === 5 || numId === 6,
+      chefeAprovou: numId === 5 || numId === 6,
+      dataAprovacaoMedico: (numId === 4 || numId === 5 || numId === 6) ? "2026-10-09T10:00:00" : null,
+      dataAprovacaoChefe: (numId === 5 || numId === 6) ? "2026-10-10T11:00:00" : null,
+      motivoReprovacao: numId === 8 ? "Procedimento sem indicação clínica no pedido." : null,
       validacao: {
         validada: numId !== 2,
         pendencias: numId === 2 ? [{ mensagem: "Procedimento sem contrato ativo com a OCS." }] : []

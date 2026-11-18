@@ -24,6 +24,7 @@ const idEdicao = route.name === 'editar-pre-guia' ? Number(route.params.id) : nu
 const contratos = ref([])
 const medicos = ref([])
 const pendencias = ref([])
+const motivoReprovacao = ref('')
 const carregando = ref(false)
 const erroCarga = ref('')
 const erro = ref('')
@@ -69,6 +70,7 @@ async function carregar() {
       }
       beneficiario.value = preGuia.beneficiario
       pendencias.value = preGuia.validacao?.pendencias || []
+      motivoReprovacao.value = preGuia.motivoReprovacao || ''
       form.medicoId = preGuia.medico.id
       form.itens = preGuia.procedimentos.map(p => ({
         contratoId: contratos.value.find(c => c.procedimentoId === p.procedimentoId && c.ocsCnpj === p.ocs.cnpj)?.id || '',
@@ -165,6 +167,8 @@ async function salvar(enviar) {
 function novaSolicitacao() {
   resultado.value = null
   beneficiario.value = null
+  pendencias.value = []
+  motivoReprovacao.value = ''
   form.itens = [{ contratoId: '', quantidade: 1 }]
   if (!ehMedico) form.medicoId = ''
 }
@@ -179,7 +183,7 @@ onMounted(carregar)
         <h1 class="fx-titulo">{{ titulo }}</h1>
         <p class="fx-subtitulo">
           <template v-if="ehMedico">Ao enviar, sua aprovação já fica registrada. Falta só a do Chefe do FUSEx.</template>
-          <template v-else>Ao enviar, o sistema valida a pré-guia e ela vai para o Médico e para o Chefe do FUSEx.</template>
+          <template v-else>Ao enviar, o sistema valida a pré-guia e ela segue para aprovação sequencial: primeiro pelo Médico e depois pelo Chefe do FUSEx.</template>
         </p>
       </header>
 
@@ -205,6 +209,10 @@ onMounted(carregar)
       </section>
 
       <form v-else-if="!carregando && !erroCarga" class="fx-conteudo" novalidate @submit.prevent="salvar(true)">
+        <div v-if="motivoReprovacao" class="fx-alerta fx-alerta-vermelho" role="alert">
+          <strong>Motivo da reprovação:</strong> {{ motivoReprovacao }}
+        </div>
+
         <div v-if="pendencias.length" class="fx-alerta fx-alerta-vermelho" role="alert">
           <strong>{{ route.query.pendente ? 'A validação encontrou pendências. Corrija e envie de novo:' : 'Pendências da última validação:' }}</strong>
           <ul class="pendencias">

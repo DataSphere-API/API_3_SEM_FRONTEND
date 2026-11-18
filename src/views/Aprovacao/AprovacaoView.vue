@@ -10,7 +10,15 @@ import {
 import { sessao } from '../../stores/sessao.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
-import { numeroPreGuia, seloAprovacao, seloStatus } from '../../utils/fluxoPreGuia.js'
+import {
+  numeroPreGuia,
+  seloAprovacao,
+  seloStatus,
+  ehAguardandoAprovacaoMedico,
+  ehAguardandoAprovacaoChefe,
+  filtrarFilaAprovacao,
+  filtrarFilaPendentes
+} from '../../utils/fluxoPreGuia.js'
 
 const souMedico = sessao.perfilAtivo === 'MEDICO'
 const meuCampo = souMedico ? 'medicoAprovou' : 'chefeAprovou'
@@ -29,13 +37,18 @@ const reprovando = ref(false)
 const erroDecisao = ref('')
 const decidindo = ref(false)
 
-const pendentes = computed(() => preGuias.value.filter(p => p.status === 'VALIDADA' && !p[meuCampo]))
-const lista = computed(() => (aba.value === 'pendentes' ? pendentes.value : preGuias.value))
+const preGuiasFiltradas = computed(() => filtrarFilaAprovacao(preGuias.value, sessao.perfilAtivo))
+const pendentes = computed(() => filtrarFilaPendentes(preGuiasFiltradas.value, sessao.perfilAtivo))
+const lista = computed(() => (aba.value === 'pendentes' ? pendentes.value : preGuiasFiltradas.value))
+
+function ehPendente(p) {
+  if (!p) return false
+  return souMedico ? ehAguardandoAprovacaoMedico(p) : ehAguardandoAprovacaoChefe(p)
+}
 
 const minhaAprovacaoPendente = computed(() => {
   const p = selecionada.value
-  if (!p || p.status !== 'VALIDADA') return false
-  return souMedico ? !p.dataAprovacaoMedico : !p.dataAprovacaoChefe
+  return ehPendente(p)
 })
 
 async function carregar() {
@@ -70,10 +83,11 @@ async function aprovar() {
   decidindo.value = true
   try {
     const resposta = await aprovarPreGuia(selecionada.value.id)
+    const id = resposta.preGuiaId || resposta.id || selecionada.value.id
     aviso.value =
       resposta.status === 'APROVADA'
-        ? `${numeroPreGuia(resposta.preGuiaId)} aprovada. Com as duas aprovações, ela já foi para o emissor.`
-        : `${numeroPreGuia(resposta.preGuiaId)} aprovada. Falta a aprovação do ${outroRotulo}.`
+        ? `${numeroPreGuia(id)} aprovada. Com as duas aprovações, ela já foi para o emissor.`
+        : `${numeroPreGuia(id)} aprovada. Falta a aprovação do Chefe do FUSEx.`
     selecionada.value = null
     await carregar()
   } catch (e) {
@@ -111,7 +125,7 @@ onMounted(carregar)
       <header>
         <h1 class="fx-titulo">Pré-guias para aprovar</h1>
         <p class="fx-subtitulo">
-          Médico e Chefe do FUSEx aprovam em paralelo. A guia só vai para o emissor quando os dois aprovam.
+          A aprovação é sequencial: primeiro o Médico e depois o Chefe do FUSEx. A guia só vai para o emissor quando os dois aprovarem.
         </p>
       </header>
 
@@ -164,7 +178,7 @@ onMounted(carregar)
                 </span>
               </span>
               <button type="button" class="fx-botao" @click="abrir(p.id)">
-                {{ p.status === 'VALIDADA' && !p[meuCampo] ? 'Analisar' : 'Ver detalhes' }}
+                {{ ehPendente(p) ? 'Analisar' : 'Ver detalhes' }}
               </button>
             </div>
           </li>

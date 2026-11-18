@@ -34,8 +34,8 @@ defineProps({
       </div>
     </dl>
 
-    <p v-if="preGuia.status === 'REPROVADA'" class="fx-alerta fx-alerta-vermelho">
-      <strong>Reprovada:</strong> {{ preGuia.motivoReprovacao }}
+    <p v-if="preGuia.status === 'REPROVADA' || preGuia.motivoReprovacao" class="fx-alerta fx-alerta-vermelho">
+      <strong>Motivo da reprovação:</strong> {{ preGuia.motivoReprovacao }}
     </p>
 
     <div v-if="preGuia.validacao?.pendencias?.length" class="fx-alerta fx-alerta-vermelho">

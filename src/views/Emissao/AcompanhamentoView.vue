@@ -89,7 +89,7 @@ async function enviar(p) {
     const resultado = await enviarParaAprovacao(p.id)
     avisoTom.value = resultado.validada ? 'verde' : 'ambar'
     aviso.value = resultado.validada
-      ? `${numeroPreGuia(p.id)} enviada para o Médico e para o Chefe do FUSEx.`
+      ? `${numeroPreGuia(p.id)} enviada para aprovação (primeiro Médico, depois Chefe do FUSEx).`
       : `${numeroPreGuia(p.id)} ficou com pendências: ${resultado.pendencias.map(x => x.mensagem).join('; ')}.`
     detalhe.value = null
     await carregar()
