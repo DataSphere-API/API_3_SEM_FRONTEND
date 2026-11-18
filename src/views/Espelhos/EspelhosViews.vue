@@ -21,6 +21,13 @@ const erro = ref('')
 const aberto = ref(null)
 const itens = ref([])
 
+const totalAberto = computed(() => {
+  if (itens.value && itens.value.length > 0) {
+    return itens.value.reduce((soma, i) => soma + (Number(i.valor) || 0), 0)
+  }
+  return aberto.value?.valorTotal ?? 0
+})
+
 // A OCS vê só os dela, do mais novo para o mais antigo.
 const lista = computed(() => [...espelhos.value].sort((a, b) => b.id - a.id))
 // Reprovados pelo auditor: a OCS corrige e reenvia.
@@ -73,7 +80,10 @@ onMounted(carregar)
       <section v-if="reprovados.length && !aberto" class="fx-cartao">
         <h2 class="fx-secao-titulo">Devolvidos pelo auditor</h2>
         <div v-for="e in reprovados" :key="e.id" class="reprovado">
-          <span><span class="fx-mono">#{{ e.id }}</span> · {{ e.motivoReprovacao }}</span>
+          <span>
+            <span class="fx-mono">#{{ e.id }}</span>
+            <span v-if="e.motivoReprovacao"> · {{ e.motivoReprovacao }}</span>
+          </span>
           <router-link :to="`/ocs/espelhos/${e.id}/corrigir`" class="fx-botao link-botao">Corrigir e reenviar</router-link>
         </div>
       </section>
@@ -104,7 +114,8 @@ onMounted(carregar)
                 <td class="fx-mono">{{ formatarMoeda(e.valorTotal) }}</td>
                 <td>
                   <span class="fx-selo" :class="selo(e.status).classe">{{ selo(e.status).texto }}</span>
-                  <span v-if="e.devolucoes && e.status === 'EM_ABERTO'" class="fx-suave"> · reenviado</span>
+                  <span v-if="e.devolucoes" class="fx-suave"> · {{ e.devolucoes }} devoluç{{ e.devolucoes === 1 ? 'ão' : 'ões' }}</span>
+                  <span v-else-if="e.status === 'EM_ABERTO' && e.reenviado" class="fx-suave"> · reenviado</span>
                 </td>
                 <td><button type="button" class="fx-botao-secundario" @click="abrir(e)">Ver</button></td>
               </tr>
@@ -129,10 +140,13 @@ onMounted(carregar)
           </div>
           <p class="fx-suave">
             {{ formatarData(aberto.dataInicio) }} a {{ formatarData(aberto.dataFim) }} · {{ aberto.quantidadeItens }}
-            atendimento(s) · Total <span class="fx-mono">{{ formatarMoeda(aberto.valorTotal) }}</span>
+            atendimento(s) · Total <span class="fx-mono">{{ formatarMoeda(totalAberto) }}</span>
           </p>
-          <p v-if="aberto.status === 'REPROVADO'" class="fx-alerta fx-alerta-vermelho">
+          <p v-if="aberto.status === 'REPROVADO' && aberto.motivoReprovacao" class="fx-alerta fx-alerta-vermelho">
             Devolvido pelo auditor: {{ aberto.motivoReprovacao }}
+          </p>
+          <p v-if="aberto.devolucoes" class="fx-suave">
+            Devoluções: {{ aberto.devolucoes }}
           </p>
           <div class="fx-tabela-rolagem">
             <table class="fx-tabela">

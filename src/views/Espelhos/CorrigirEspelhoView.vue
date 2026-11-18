@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  buscarEspelho,
   listarEspelhos,
   listarItensEspelho,
   corrigirItemEspelho,
@@ -20,20 +21,22 @@ const id = Number(route.params.id)
 const espelho = ref(null)
 const itens = ref([])
 const valores = ref({})
-const removidos = ref({})
 const carregando = ref(false)
 const erro = ref('')
 const enviando = ref(false)
 
-const mantidos = computed(() => itens.value.filter(i => !removidos.value[i.id]))
-const total = computed(() => mantidos.value.reduce((soma, i) => soma + (Number(valores.value[i.id]) || 0), 0))
+const total = computed(() => itens.value.reduce((soma, i) => soma + (Number(valores.value[i.id]) || 0), 0))
 
 async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    const lista = await listarEspelhos({ cnpj: sessao.usuario?.ocsCnpj })
-    espelho.value = lista.find(e => e.id === id) || null
+    try {
+      espelho.value = await buscarEspelho(id)
+    } catch {
+      const lista = await listarEspelhos({ cnpj: sessao.usuario?.ocsCnpj })
+      espelho.value = lista.find(e => e.id === id) || null
+    }
     if (!espelho.value) {
       erro.value = 'Espelho não encontrado.'
       return
@@ -51,13 +54,45 @@ async function carregar() {
   }
 }
 
+async function removerItem(item) {
+  erro.value = ''
+  try {
+    await removerItemEspelho(id, item.id)
+    itens.value = itens.value.filter(i => i.id !== item.id)
+    delete valores.value[item.id]
+  } catch (e) {
+    erro.value = e.mensagemUsuario || 'Não foi possível remover o item.'
+  }
+}
+
+async function salvarItem(item) {
+  const novoValor = Number(valores.value[item.id])
+  if (!(novoValor > 0)) {
+    erro.value = 'Informe um valor maior que zero.'
+    return
+  }
+  if (novoValor === item.valor) return
+  erro.value = ''
+  try {
+    const atualizado = await corrigirItemEspelho(id, item.id, novoValor)
+    if (atualizado && atualizado.valor != null) {
+      item.valor = Number(atualizado.valor)
+      valores.value[item.id] = Number(atualizado.valor)
+    } else {
+      item.valor = novoValor
+    }
+  } catch (e) {
+    erro.value = e.mensagemUsuario || 'Não foi possível corrigir o item.'
+  }
+}
+
 async function reenviar() {
   erro.value = ''
-  if (mantidos.value.length === 0) {
+  if (itens.value.length === 0) {
     erro.value = 'O espelho precisa ter pelo menos um atendimento.'
     return
   }
-  if (mantidos.value.some(i => !(Number(valores.value[i.id]) > 0))) {
+  if (itens.value.some(i => !(Number(valores.value[i.id]) > 0))) {
     erro.value = 'Informe um valor maior que zero em todos os atendimentos.'
     return
   }
@@ -65,10 +100,12 @@ async function reenviar() {
   enviando.value = true
   try {
     for (const item of itens.value) {
-      if (removidos.value[item.id]) {
-        await removerItemEspelho(id, item.id)
-      } else if (Number(valores.value[item.id]) !== item.valor) {
-        await corrigirItemEspelho(id, item.id, Number(valores.value[item.id]))
+      const novoValor = Number(valores.value[item.id])
+      if (novoValor !== item.valor) {
+        const atualizado = await corrigirItemEspelho(id, item.id, novoValor)
+        if (atualizado && atualizado.valor != null) {
+          item.valor = Number(atualizado.valor)
+        }
       }
     }
     await reenviarEspelho(id)
@@ -101,7 +138,7 @@ onMounted(carregar)
       <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
 
       <template v-if="espelho && espelho.status === 'REPROVADO' && !carregando">
-        <p class="fx-alerta fx-alerta-ambar">
+        <p v-if="espelho.motivoReprovacao" class="fx-alerta fx-alerta-ambar">
           <strong>Motivo da reprovação:</strong> {{ espelho.motivoReprovacao }}
         </p>
 
@@ -123,11 +160,11 @@ onMounted(carregar)
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="i in itens" :key="i.id" :class="{ removido: removidos[i.id] }">
+                <tr v-for="i in itens" :key="i.id">
                   <td class="fx-mono">{{ i.atendimentoId }}</td>
                   <td>{{ i.descricao }}</td>
                   <td class="fx-mono">{{ i.beneficiarioId }}</td>
-                  <td class="fx-mono">{{ i.valorContratado === null ? 'Sem contrato' : formatarMoeda(i.valorContratado) }}</td>
+                  <td class="fx-mono">{{ i.valorContratado === null || i.valorContratado === undefined ? 'Sem contrato' : formatarMoeda(i.valorContratado) }}</td>
                   <td>
                     <input
                       v-model="valores[i.id]"
@@ -135,19 +172,19 @@ onMounted(carregar)
                       min="0.01"
                       step="0.01"
                       class="fx-entrada campo-valor"
-                      :class="{ 'fx-entrada-erro': !removidos[i.id] && avaliarCobranca(valores[i.id], i.valorContratado).diferenca > 0 }"
-                      :disabled="removidos[i.id]"
+                      :class="{ 'fx-entrada-erro': avaliarCobranca(valores[i.id], i.valorContratado).diferenca > 0 }"
                       :aria-label="`Valor cobrado do atendimento ${i.atendimentoId}`"
+                      @change="salvarItem(i)"
                     />
                   </td>
                   <td>
                     <button
                       type="button"
-                      class="fx-botao-secundario"
-                      :class="{ 'fx-botao-perigo': !removidos[i.id] }"
-                      @click="removidos[i.id] = !removidos[i.id]"
+                      class="fx-botao-secundario fx-botao-perigo"
+                      :disabled="enviando"
+                      @click="removerItem(i)"
                     >
-                      {{ removidos[i.id] ? 'Manter' : 'Tirar do espelho' }}
+                      Tirar do espelho
                     </button>
                   </td>
                 </tr>
@@ -158,7 +195,7 @@ onMounted(carregar)
         </section>
 
         <div class="rodape">
-          <strong>{{ mantidos.length }} atendimento(s) · Total: <span class="fx-mono">{{ formatarMoeda(total) }}</span></strong>
+          <strong>{{ itens.length }} atendimento(s) · Total: <span class="fx-mono">{{ formatarMoeda(total) }}</span></strong>
           <button type="button" class="fx-botao" :disabled="enviando" @click="reenviar">
             {{ enviando ? 'Reenviando...' : 'Reenviar para auditoria' }}
           </button>
@@ -176,16 +213,6 @@ onMounted(carregar)
 
 .campo-valor {
   width: 140px;
-}
-
-.removido td {
-  opacity: 0.5;
-  text-decoration: line-through;
-}
-
-.removido td:last-child {
-  opacity: 1;
-  text-decoration: none;
 }
 
 .rodape {

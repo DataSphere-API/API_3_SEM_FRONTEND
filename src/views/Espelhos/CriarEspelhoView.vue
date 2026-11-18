@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { criarEspelho } from '../../services/espelhoService.js'
+import { listarAtendimentosDaOcs } from '../../services/atendimentoService.js'
 import { sessao } from '../../stores/sessao.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
@@ -60,7 +61,16 @@ async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    atendimentos.value = []
+    if (cnpj) {
+      atendimentos.value = await listarAtendimentosDaOcs(cnpj)
+      atendimentos.value.forEach(a => {
+        if (selecionados.value[a.atendimentoId] === undefined) {
+          selecionados.value[a.atendimentoId] = true
+        }
+      })
+    } else {
+      atendimentos.value = []
+    }
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar os atendimentos.'
   } finally {
@@ -90,10 +100,13 @@ async function enviar() {
   enviando.value = true
   try {
     await criarEspelho({
+      atendimentoId: escolhidos.value[0].atendimentoId,
       ocsId: cnpj,
-      dataInicio: dataInicio.value,
-      dataFim: dataFim.value,
-      itens: escolhidos.value.map(a => ({ atendimentoId: a.atendimentoId, valor: Number(valores.value[a.atendimentoId]) }))
+      itens: escolhidos.value.map(a => ({
+        beneficiarioId: a.beneficiario?.precCp || a.beneficiarioId || '',
+        descricao: a.procedimento || a.descricao || '',
+        valor: Number(valores.value[a.atendimentoId])
+      }))
     })
     router.push('/ocs/espelhos')
   } catch (e) {
@@ -149,6 +162,47 @@ onMounted(carregar)
         <p v-else-if="disponiveis.length === 0" class="fx-alerta fx-alerta-cinza">
           Nenhum atendimento realizado neste período.
         </p>
+        <div v-else class="fx-tabela-rolagem">
+          <table class="fx-tabela">
+            <thead>
+              <tr>
+                <th><span class="fx-suave">Incluir</span></th>
+                <th>Atendimento</th>
+                <th>Beneficiário</th>
+                <th>Procedimento</th>
+                <th>Realizado em</th>
+                <th>Valor cobrado (R$)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in disponiveis" :key="a.atendimentoId">
+                <td>
+                  <input
+                    v-model="selecionados[a.atendimentoId]"
+                    type="checkbox"
+                    class="marcar"
+                    :aria-label="`Incluir atendimento ${a.atendimentoId}`"
+                  />
+                </td>
+                <td class="fx-mono">{{ a.atendimentoId }}</td>
+                <td>{{ a.beneficiario?.nome || a.beneficiario }} <span class="fx-suave fx-mono">· {{ a.beneficiario?.precCp || a.beneficiarioId }}</span></td>
+                <td>{{ a.procedimento || a.descricao }}<span v-if="a.qtdAutorizada > 1" class="fx-suave"> · {{ a.qtdAutorizada }} sessões</span></td>
+                <td>{{ formatarData(a.dataRealizacao) }}</td>
+                <td>
+                  <input
+                    v-model="valores[a.atendimentoId]"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    class="fx-entrada campo-valor"
+                    :disabled="!selecionados[a.atendimentoId]"
+                    :aria-label="`Valor cobrado do atendimento ${a.atendimentoId}`"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>

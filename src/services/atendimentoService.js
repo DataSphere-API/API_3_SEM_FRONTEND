@@ -36,3 +36,13 @@ export async function validarBaixaQr(atendimentoId, codigo, cnpj) {
     throw traduzirErro(erro)
   }
 }
+
+// GET /ocs/{cnpj}/atendimentos
+export async function listarAtendimentosDaOcs(cnpj) {
+  try {
+    const response = await api.get(`/ocs/${encodeURIComponent(cnpj)}/atendimentos`)
+    return response.data
+  } catch (erro) {
+    throw traduzirErro(erro)
+  }
+}

@@ -1,20 +1,9 @@
 import { api } from './http.js'
-import {
-  mockListarEspelhos,
-  mockListarItensEspelho,
-  mockCriarEspelho,
-  mockCorrigirItemEspelho,
-  mockRemoverItemEspelho,
-  mockReenviarEspelho
-} from '../mocks/espelhoMock.js'
 import { traduzirErro } from '../utils/erros.js'
 
-const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-
 // filtros: { cnpj, status } — a OCS lista só os dela pelo cnpj.
-export async function listarEspelhos(filtros = {}, { usarMock = USAR_MOCK } = {}) {
+export async function listarEspelhos(filtros = {}) {
   try {
-    if (usarMock) return await mockListarEspelhos(filtros)
     const response = await api.get('/espelhos', { params: filtros })
     return response.data
   } catch (erro) {
@@ -22,9 +11,17 @@ export async function listarEspelhos(filtros = {}, { usarMock = USAR_MOCK } = {}
   }
 }
 
-export async function listarItensEspelho(id, { usarMock = USAR_MOCK } = {}) {
+export async function buscarEspelho(id) {
   try {
-    if (usarMock) return await mockListarItensEspelho(id)
+    const response = await api.get(`/espelhos/${id}`)
+    return response.data
+  } catch (erro) {
+    throw traduzirErro(erro, { 404: 'Espelho não encontrado.' })
+  }
+}
+
+export async function listarItensEspelho(id) {
+  try {
     const response = await api.get(`/espelhos/${id}/itens`)
     return response.data
   } catch (erro) {
@@ -34,7 +31,6 @@ export async function listarItensEspelho(id, { usarMock = USAR_MOCK } = {}) {
 
 export async function criarEspelho(dados) {
   try {
-    if (USAR_MOCK) return await mockCriarEspelho(dados)
     const response = await api.post('/espelhos', dados)
     return response.data
   } catch (erro) {
@@ -62,10 +58,13 @@ export async function reprovarEspelho(id, motivo) {
 
 // ---------- OCS corrige um espelho reprovado e reenvia ----------
 
-export async function corrigirItemEspelho(id, itemId, valor) {
+export async function corrigirItemEspelho(id, itemId, dadosOuValor) {
   try {
-    if (USAR_MOCK) return await mockCorrigirItemEspelho(id, itemId, { valor })
-    await api.patch(`/espelhos/${id}/itens/${itemId}`, { valor })
+    const payload = typeof dadosOuValor === 'object' && dadosOuValor !== null
+      ? dadosOuValor
+      : { valor: dadosOuValor }
+    const response = await api.patch(`/espelhos/${id}/itens/${itemId}`, payload)
+    return response.data
   } catch (erro) {
     throw traduzirErro(erro, { 409: 'Só dá para corrigir um espelho reprovado.' })
   }
@@ -73,8 +72,8 @@ export async function corrigirItemEspelho(id, itemId, valor) {
 
 export async function removerItemEspelho(id, itemId) {
   try {
-    if (USAR_MOCK) return await mockRemoverItemEspelho(id, itemId)
-    await api.delete(`/espelhos/${id}/itens/${itemId}`)
+    const response = await api.delete(`/espelhos/${id}/itens/${itemId}`)
+    return response.data
   } catch (erro) {
     throw traduzirErro(erro, { 422: 'O espelho precisa ter pelo menos um atendimento.' })
   }
@@ -82,7 +81,6 @@ export async function removerItemEspelho(id, itemId) {
 
 export async function reenviarEspelho(id) {
   try {
-    if (USAR_MOCK) return await mockReenviarEspelho(id)
     const response = await api.post(`/espelhos/${id}/reenviar`)
     return response.data
   } catch (erro) {
