@@ -1,9 +1,8 @@
 <script setup>
 import { formatarMoeda } from '../utils/avaliarLisura.js'
 import { formatarData, formatarDataHora } from '../utils/documentos.js'
-import { numeroPreGuia, seloAprovacao, seloStatus } from '../utils/fluxoPreGuia.js'
+import { cargoDaAssinatura, numeroPreGuia, seloStatus } from '../utils/fluxoPreGuia.js'
 
-// preGuia no formato do GET /pre-guias/{id} (#76).
 defineProps({
   preGuia: { type: Object, required: true }
 })
@@ -72,24 +71,16 @@ defineProps({
       </table>
     </div>
 
-    <div class="decisoes">
-      <div
-        v-for="item in [
-          { quem: 'Médico', data: preGuia.dataAprovacaoMedico },
-          { quem: 'Chefe do FUSEx', data: preGuia.dataAprovacaoChefe }
-        ]"
-        :key="item.quem"
-        class="decisao"
-      >
-        <strong>{{ item.quem }}</strong>
-        <span>
-          <span class="fx-selo" :class="seloAprovacao(preGuia.status, Boolean(item.data)).classe">
-            {{ seloAprovacao(preGuia.status, Boolean(item.data)).texto }}
-          </span>
-          <span v-if="item.data" class="fx-suave"> {{ formatarDataHora(item.data) }}</span>
-        </span>
-      </div>
+    <div v-if="preGuia.assinatura" class="assinatura">
+      <strong>{{ preGuia.status === 'REPROVADA' ? 'Reprovada por' : 'Aprovada por' }}</strong>
+      <span>
+        {{ preGuia.assinatura.nome }} · {{ cargoDaAssinatura(preGuia.assinatura.perfil) }}
+        <span class="fx-suave fx-mono"> · usuário {{ preGuia.assinatura.usuarioId }} · {{ formatarDataHora(preGuia.assinatura.dataHora) }}</span>
+      </span>
     </div>
+    <p v-else-if="preGuia.status === 'VALIDADA'" class="fx-alerta fx-alerta-ambar">
+      Aguardando a aprovação do médico responsável ou do Chefe do FUSEx. Basta uma das duas.
+    </p>
   </section>
 </template>
 
@@ -139,16 +130,10 @@ defineProps({
   padding-left: 1.2rem;
 }
 
-.decisoes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.decisao {
-  flex: 1 1 240px;
+.assinatura {
   padding: 0.75rem 0.9rem;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
