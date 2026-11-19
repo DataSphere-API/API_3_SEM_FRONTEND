@@ -11,10 +11,10 @@ export async function listarAtendimentosDaOcs(cnpj) {
   }
 }
 
-// POST /atendimentos/{id}/sessoes. O back usa a OCS do login; o cnpj vai porque o corpo ainda o exige.
-export async function registrarSessao(atendimentoId, cnpj) {
+// POST /atendimentos/{id}/sessoes, sem corpo: o back usa a OCS do login.
+export async function registrarSessao(atendimentoId) {
   try {
-    const { data } = await api.post(`/atendimentos/${atendimentoId}/sessoes`, { cnpj })
+    const { data } = await api.post(`/atendimentos/${atendimentoId}/sessoes`)
     return data
   } catch (erro) {
     throw traduzirErro(erro, { padrao: 'Não foi possível registrar a sessão.' })

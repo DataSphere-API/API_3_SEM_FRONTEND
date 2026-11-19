@@ -60,7 +60,7 @@ async function realizarSessao(atendimento) {
   erroAcao.value = ''
   processando.value = atendimento.atendimentoId
   try {
-    const resposta = await registrarSessao(atendimento.atendimentoId, cnpj)
+    const resposta = await registrarSessao(atendimento.atendimentoId)
     aviso.value =
       resposta.saldo > 0
         ? `Sessão ${resposta.numeroSessao} registrada para ${atendimento.beneficiario.nome}. Faltam ${resposta.saldo}.`
