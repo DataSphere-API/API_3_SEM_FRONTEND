@@ -89,7 +89,7 @@ async function enviar(p) {
     const resultado = await enviarParaAprovacao(p.id)
     avisoTom.value = resultado.validada ? 'verde' : 'ambar'
     aviso.value = resultado.validada
-      ? `${numeroPreGuia(p.id)} enviada para o Médico e para o Chefe do FUSEx.`
+      ? `${numeroPreGuia(p.id)} enviada para aprovação do médico responsável ou do Chefe do FUSEx.`
       : `${numeroPreGuia(p.id)} ficou com pendências: ${resultado.pendencias.map(x => x.mensagem).join('; ')}.`
     detalhe.value = null
     await carregar()
@@ -194,8 +194,7 @@ onMounted(carregar)
               <th>Beneficiário</th>
               <th>Procedimentos</th>
               <th>Criada</th>
-              <th>Médico</th>
-              <th>Chefe do FUSEx</th>
+              <th>Aprovação</th>
               <th>Situação</th>
               <th><span class="fx-suave">Ação</span></th>
             </tr>
@@ -207,14 +206,7 @@ onMounted(carregar)
               <td>{{ p.qtdProcedimentos }} · {{ formatarMoeda(p.valorTotal) }}</td>
               <td>{{ formatarData(p.dataCriacao) }}</td>
               <td>
-                <span class="fx-selo" :class="seloAprovacao(p.status, p.medicoAprovou).classe">
-                  {{ seloAprovacao(p.status, p.medicoAprovou).texto }}
-                </span>
-              </td>
-              <td>
-                <span class="fx-selo" :class="seloAprovacao(p.status, p.chefeAprovou).classe">
-                  {{ seloAprovacao(p.status, p.chefeAprovou).texto }}
-                </span>
+                <span class="fx-selo" :class="seloAprovacao(p).classe">{{ seloAprovacao(p).texto }}</span>
               </td>
               <td>
                 <span class="fx-selo" :class="seloStatus(p.status).classe">{{ seloStatus(p.status).texto }}</span>
@@ -224,7 +216,7 @@ onMounted(carregar)
               </td>
             </tr>
             <tr v-if="lista.length === 0">
-              <td colspan="8" class="fx-suave">Nenhuma pré-guia neste filtro.</td>
+              <td colspan="7" class="fx-suave">Nenhuma pré-guia neste filtro.</td>
             </tr>
           </tbody>
         </table>
