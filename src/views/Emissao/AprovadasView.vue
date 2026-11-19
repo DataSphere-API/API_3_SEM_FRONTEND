@@ -2,6 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import PreGuiaResumo from '../../components/PreGuiaResumo.vue'
 import { listarPreGuiasDoFluxo, buscarPreGuiaDoFluxo, emitirGuia } from '../../services/fluxoPreGuiaService.js'
+import { baixarDocumentoDaGuia } from '../../services/guiasService.js'
+import { salvarArquivo } from '../../utils/download.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
 import { numeroPreGuia } from '../../utils/fluxoPreGuia.js'
@@ -13,36 +15,36 @@ const aviso = ref('')
 const erroEmissao = ref('')
 const emitindo = ref(null)
 const aberta = ref(null)
-// id da pré-guia -> validoAte devolvido pelo back (a listagem não traz esse campo).
-const validades = ref({})
+const baixando = ref(null)
 
 const prontas = computed(() => preGuias.value.filter(p => p.status === 'APROVADA'))
 const emitidas = computed(() =>
   preGuias.value.filter(p => p.status === 'EMITIDA').sort((a, b) => (b.dataEmissao || '').localeCompare(a.dataEmissao || ''))
 )
 
-// Busca o validoAte das emitidas ainda sem validade conhecida. Falha em uma não derruba a tela.
-async function carregarValidades() {
-  const faltando = emitidas.value.filter(p => !(p.id in validades.value))
-  if (faltando.length === 0) return
-  const resultados = await Promise.allSettled(faltando.map(p => buscarPreGuiaDoFluxo(p.id)))
-  const novas = { ...validades.value }
-  resultados.forEach((resultado, i) => {
-    if (resultado.status === 'fulfilled') novas[faltando[i].id] = resultado.value.validoAte
-  })
-  validades.value = novas
-}
-
 async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
     preGuias.value = await listarPreGuiasDoFluxo()
-    await carregarValidades()
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar as pré-guias aprovadas.'
   } finally {
     carregando.value = false
+  }
+}
+
+// PDF guardado na emissão da guia (GET /guias/{id}/documento).
+async function baixarPdf(p) {
+  erroEmissao.value = ''
+  baixando.value = p.id
+  try {
+    const arquivo = await baixarDocumentoDaGuia(p.guiaId)
+    salvarArquivo(arquivo, `guia-${p.guiaNumero || p.guiaId}.pdf`)
+  } catch (e) {
+    erroEmissao.value = e.mensagemUsuario || 'Não foi possível baixar o PDF da guia.'
+  } finally {
+    baixando.value = null
   }
 }
 
@@ -64,7 +66,6 @@ async function emitir(id) {
   emitindo.value = id
   try {
     const guia = await emitirGuia(id)
-    validades.value = { ...validades.value, [id]: guia.validoAte }
     aviso.value = `Guia ${numeroPreGuia(id)} emitida em ${formatarData(guia.dataEmissao)}, válida até ${formatarData(guia.validoAte)}. Os procedimentos já estão disponíveis para as OCS na tela de Atendimentos.`
     aberta.value = null
     await carregar()
@@ -127,18 +128,24 @@ onMounted(carregar)
                 <th>Emissão</th>
                 <th>Validade</th>
                 <th>Valor</th>
+                <th><span class="fx-suave">Documento</span></th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="p in emitidas" :key="p.id">
-                <td class="fx-mono">{{ numeroPreGuia(p.id) }}</td>
+                <td class="fx-mono">{{ p.guiaNumero || numeroPreGuia(p.id) }}</td>
                 <td>{{ p.beneficiarioNome }}</td>
                 <td>{{ formatarData(p.dataEmissao) }}</td>
-                <td>{{ formatarData(validades[p.id]) }}</td>
+                <td>{{ formatarData(p.validoAte) }}</td>
                 <td class="fx-mono">{{ formatarMoeda(p.valorTotal) }}</td>
+                <td>
+                  <button type="button" class="fx-botao-secundario" :disabled="baixando === p.id || !p.guiaId" @click="baixarPdf(p)">
+                    {{ baixando === p.id ? 'Baixando...' : 'PDF' }}
+                  </button>
+                </td>
               </tr>
               <tr v-if="emitidas.length === 0">
-                <td colspan="5" class="fx-suave">Nenhuma guia emitida ainda.</td>
+                <td colspan="6" class="fx-suave">Nenhuma guia emitida ainda.</td>
               </tr>
             </tbody>
           </table>
