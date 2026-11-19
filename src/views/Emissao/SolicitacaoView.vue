@@ -21,6 +21,8 @@ const idEdicao = route.name === 'editar-pre-guia' ? Number(route.params.id) : nu
 const contratos = ref([])
 const medicos = ref([])
 const pendencias = ref([])
+// Decisão anterior de uma pré-guia reprovada que está sendo reeditada.
+const reprovacao = ref(null)
 const carregando = ref(false)
 const erroCarga = ref('')
 const erro = ref('')
@@ -63,6 +65,9 @@ async function carregar() {
       if (!EDITAVEIS.includes(preGuia.status)) {
         erroCarga.value = 'Esta pré-guia já foi enviada para aprovação e não pode mais ser editada.'
         return
+      }
+      if (preGuia.status === 'REPROVADA') {
+        reprovacao.value = { motivo: preGuia.motivoReprovacao, nome: preGuia.assinatura?.nome }
       }
       beneficiario.value = preGuia.beneficiario
       pendencias.value = preGuia.validacao?.pendencias || []
@@ -195,6 +200,10 @@ onMounted(carregar)
       </section>
 
       <form v-else-if="!carregando && !erroCarga" class="fx-conteudo" novalidate @submit.prevent="salvar(true)">
+        <div v-if="reprovacao" class="fx-alerta fx-alerta-vermelho" role="alert">
+          <strong>Reprovada{{ reprovacao.nome ? ` por ${reprovacao.nome}` : '' }}:</strong> {{ reprovacao.motivo }}
+          <p>Corrija e envie de novo. Ao salvar, a decisão anterior é apagada e a pré-guia precisa ser aprovada outra vez.</p>
+        </div>
         <div v-if="pendencias.length" class="fx-alerta fx-alerta-vermelho" role="alert">
           <strong>{{ route.query.pendente ? 'A validação encontrou pendências. Corrija e envie de novo:' : 'Pendências da última validação:' }}</strong>
           <ul class="pendencias">
