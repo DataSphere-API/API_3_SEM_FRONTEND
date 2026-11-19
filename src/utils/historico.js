@@ -1,5 +1,3 @@
-// Traduções da linha do tempo. Regra: valor desconhecido aparece com o texto
-// original que o back enviou, nunca vazio.
 
 const STATUS = {
   PRE_GUIA: 'Rascunho',
@@ -22,7 +20,8 @@ const STATUS = {
   CANCELADO: 'Cancelado',
   ATIVA: 'Fatura aberta',
   REGERADA: 'Fatura regerada',
-  ENCAMINHADA_APROVACAO: 'Encaminhada para aprovação'
+  ENCAMINHADA_APROVACAO: 'Encaminhada para aprovação',
+  LIQUIDADA: 'Fatura liquidada'
 }
 
 const ORIGEM = {
@@ -39,7 +38,9 @@ const ORIGEM = {
   auditoria: 'Auditoria',
   'aprovacao-do-espelho': 'Aberta com o primeiro espelho aprovado do mês',
   'encaminhamento-para-aprovacao': 'Encaminhada para aprovação',
-  'regeracao-por-espelho-corrigido': 'Regerada após correção do espelho'
+  'regeracao-por-espelho-corrigido': 'Regerada após correção do espelho',
+  'aprovacao-da-fatura': 'Fatura aprovada pelo auditor',
+  'liquidacao-da-fatura': 'Pagamento da fatura registrado'
 }
 
 const ENTIDADE = {

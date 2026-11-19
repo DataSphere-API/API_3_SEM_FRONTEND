@@ -6,7 +6,6 @@ function temResumoMensal(fatura) {
     && typeof fatura.ocsNome === 'string'
 }
 
-// filtros: { cnpj, competencia: 'AAAA-MM', status }
 export async function listarFaturasMensais(filtros = {}) {
   try {
     const { data } = await api.get('/faturas', { params: filtros })
@@ -36,5 +35,43 @@ export async function encaminharFaturaMensal(id) {
     return response.data
   } catch (erro) {
     throw traduzirErro(erro, { 422: 'A fatura ainda não pode ser encaminhada.' })
+  }
+}
+
+export async function buscarLisuraDaFatura(id) {
+  try {
+    const { data } = await api.get(`/faturas/${id}/lisura`)
+    if (!Array.isArray(data?.itens)) throw erroDeFormato()
+    return data
+  } catch (erro) {
+    throw traduzirErro(erro, { 404: 'Fatura não encontrada.' })
+  }
+}
+
+export async function buscarDivergenciasDaFatura(id) {
+  try {
+    const { data } = await api.get(`/faturas/${id}/divergencias`)
+    if (!Array.isArray(data?.itens)) throw erroDeFormato()
+    return data
+  } catch (erro) {
+    throw traduzirErro(erro, { 404: 'Fatura não encontrada.' })
+  }
+}
+
+export async function aprovarFaturaMensal(id) {
+  try {
+    const { data } = await api.patch(`/faturas/${id}/aprovar`)
+    return data
+  } catch (erro) {
+    throw traduzirErro(erro, { 409: 'A fatura não está encaminhada para aprovação.' })
+  }
+}
+
+export async function liquidarFaturaMensal(id) {
+  try {
+    const { data } = await api.patch(`/faturas/${id}/liquidar`)
+    return data
+  } catch (erro) {
+    throw traduzirErro(erro, { 409: 'Só uma fatura aprovada pode ser liquidada.' })
   }
 }
