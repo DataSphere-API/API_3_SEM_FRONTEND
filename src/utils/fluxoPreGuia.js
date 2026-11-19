@@ -1,4 +1,3 @@
-// Status das issues US005/US006.
 const STATUS = {
   PRE_GUIA: { texto: 'Rascunho', classe: 'fx-selo-cinza' },
   COM_PENDENCIAS: { texto: 'Com pendências', classe: 'fx-selo-vermelho' },
@@ -14,20 +13,29 @@ export function seloStatus(status) {
   return STATUS[status] || { texto: status, classe: 'fx-selo-cinza' }
 }
 
-// Situação de uma das duas aprovações (médico ou chefe) a partir do status e de quem já aprovou.
-export function seloAprovacao(status, aprovou) {
-  if (aprovou) return { texto: 'Aprovou', classe: 'fx-selo-verde' }
-  if (status === 'VALIDADA') return { texto: 'Pendente', classe: 'fx-selo-ambar' }
-  if (status === 'REPROVADA') return { texto: '—', classe: 'fx-selo-cinza' }
+export function seloAprovacao(preGuia) {
+  const aprovada = ['APROVADA', 'EMITIDA'].includes(preGuia.status)
+  if (aprovada && preGuia.medicoAprovou) return { texto: 'Aprovada pelo médico', classe: 'fx-selo-verde' }
+  if (aprovada && preGuia.chefeAprovou) return { texto: 'Aprovada pelo chefe', classe: 'fx-selo-verde' }
+  if (aprovada) return { texto: 'Aprovada', classe: 'fx-selo-verde' }
+  if (preGuia.status === 'VALIDADA') return { texto: 'Aguardando médico ou chefe', classe: 'fx-selo-ambar' }
+  if (preGuia.status === 'REPROVADA') return { texto: 'Reprovada', classe: 'fx-selo-vermelho' }
   return { texto: 'Aguardando envio', classe: 'fx-selo-cinza' }
 }
 
-// O back não tem número de pré-guia: o front mostra o id formatado.
+const CARGO_DA_ASSINATURA = {
+  MEDICO: 'Médico responsável',
+  CHEFE: 'Chefe do FUSEx'
+}
+
+export function cargoDaAssinatura(perfil) {
+  return CARGO_DA_ASSINATURA[perfil] || perfil
+}
+
 export function numeroPreGuia(id) {
   return `PG ${String(id).padStart(3, '0')}`
 }
 
-// O back não tem número de guia: o front mostra o id da guia emitida formatado.
 export function numeroGuia(id) {
   return `GE ${String(id).padStart(3, '0')}`
 }
