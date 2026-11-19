@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import PreGuiaResumo from '../../components/PreGuiaResumo.vue'
-import PainelValidacaoPreGuia from '../PreGuias/components/PainelValidacaoPreGuia.vue'
+import PainelValidacaoPreGuia from './components/PainelValidacaoPreGuia.vue'
 import {
   listarPreGuiasDoFluxo,
   buscarPreGuiaDoFluxo,

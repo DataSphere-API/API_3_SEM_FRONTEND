@@ -1,4 +1,4 @@
-import { api } from './http.js'
+import { api } from './api.js'
 import { traduzirErro } from '../utils/erros.js'
 
 // GET /ocs/{cnpj}/atendimentos: só os atendimentos da OCS logada.

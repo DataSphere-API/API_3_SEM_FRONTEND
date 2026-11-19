@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import QRCode from 'qrcode'
-import { api } from '../../../services/http.js'
+import { api } from '../../../services/api.js'
 import LinhaDoTempo from '../../../components/LinhaDoTempo.vue'
 import { buscarQrCode } from '../../../services/guiasService.js'
 import {

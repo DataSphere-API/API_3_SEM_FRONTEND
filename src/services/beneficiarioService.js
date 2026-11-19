@@ -1,4 +1,4 @@
-import { api } from './http.js'
+import { api } from './api.js'
 import { traduzirErro } from '../utils/erros.js'
 
 export async function buscarBeneficiarios(busca) {
