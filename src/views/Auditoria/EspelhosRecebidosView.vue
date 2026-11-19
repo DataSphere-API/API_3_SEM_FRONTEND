@@ -15,7 +15,7 @@ const STATUS = {
 
 const FILTROS = [
   { valor: 'EM_ABERTO', rotulo: 'A auditar' },
-  { valor: 'APROVADO', rotulo: 'Aprovados' },
+  { valor: 'APROVADO', rotulo: 'Aprovados e faturados' },
   { valor: 'REPROVADO', rotulo: 'Devolvidos à OCS' },
   { valor: '', rotulo: 'Todos' }
 ]
@@ -32,7 +32,13 @@ const reprovando = ref(false)
 const erroDecisao = ref('')
 const decidindo = ref(false)
 
-const lista = computed(() => (filtro.value ? espelhos.value.filter(e => e.status === filtro.value) : espelhos.value))
+// Aprovar já inclui o espelho na fatura do mês (FATURADO); o filtro de aprovados mostra os dois.
+const STATUS_DO_FILTRO = { APROVADO: ['APROVADO', 'FATURADO'] }
+const lista = computed(() => {
+  if (!filtro.value) return espelhos.value
+  const aceitos = STATUS_DO_FILTRO[filtro.value] || [filtro.value]
+  return espelhos.value.filter(e => aceitos.includes(e.status))
+})
 const aAuditar = computed(() => espelhos.value.filter(e => e.status === 'EM_ABERTO').length)
 
 const totalContratado = computed(() => itens.value.reduce((soma, i) => soma + (Number(i.valorContratado) || 0), 0))
@@ -75,7 +81,7 @@ async function aprovar() {
   decidindo.value = true
   try {
     await aprovarEspelho(selecionado.value.id)
-    aviso.value = `Espelho #${selecionado.value.id} aprovado.`
+    aviso.value = `Espelho #${selecionado.value.id} aprovado e incluído na fatura do mês.`
     selecionado.value = null
     await carregar()
   } catch (e) {
