@@ -56,7 +56,7 @@ defineProps({
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in preGuia.procedimentos" :key="p.atendimentoId">
+          <tr v-for="p in preGuia.procedimentos" :key="`${p.procedimentoId}-${p.ocs.cnpj}`">
             <td>{{ p.nome }}</td>
             <td>{{ p.ocs.nome }}</td>
             <td class="fx-mono">{{ p.qtdSessoes }}</td>
