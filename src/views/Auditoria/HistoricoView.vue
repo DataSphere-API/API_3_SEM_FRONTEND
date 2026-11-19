@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import LinhaDoTempo from '../../components/LinhaDoTempo.vue'
-import { api } from '../../services/http.js'
+import { api } from '../../services/api.js'
 import { traduzirErro } from '../../utils/erros.js'
 import { listarEspelhos, historicoDoEspelho } from '../../services/espelhoService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'

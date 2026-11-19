@@ -1,4 +1,4 @@
-import { api } from './http.js'
+import { api } from './api.js'
 import router from '../router'
 import { sessao, encerrarSessao } from '../stores/sessao.js'
 

@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import EspelhosViews from '../views/Espelhos/EspelhosViews.vue'
+import EspelhosView from '../views/Espelhos/EspelhosView.vue'
 import CriarEspelhoView from '../views/Espelhos/CriarEspelhoView.vue'
 import CorrigirEspelhoView from '../views/Espelhos/CorrigirEspelhoView.vue'
 import MinhasGuiasView from '../views/Guias/MinhasGuiasView.vue'
@@ -33,7 +33,7 @@ const routes = [
   { path: '/cadastro', name: 'cadastro', component: CadastroBeneficiarioView, meta: { publica: true } },
   { path: '/escolher-perfil', name: 'escolher-perfil', component: EscolherPerfilView },
 
-  { path: '/ocs/espelhos', name: 'espelhos', component: EspelhosViews, meta: { perfis: ['OCS'] } },
+  { path: '/ocs/espelhos', name: 'espelhos', component: EspelhosView, meta: { perfis: ['OCS'] } },
   { path: '/ocs/espelhos/novo', name: 'espelhos-novo', component: CriarEspelhoView, meta: { perfis: ['OCS'] } },
   { path: '/ocs/espelhos/:id/corrigir', name: 'corrigir-espelho', component: CorrigirEspelhoView, meta: { perfis: ['OCS'] } },
   // Fatura mensal por OCS (substitui a tela antiga de gerar/regerar fatura por espelho).

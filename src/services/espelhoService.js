@@ -1,4 +1,4 @@
-import { api } from './http.js'
+import { api } from './api.js'
 import { traduzirErro } from '../utils/erros.js'
 
 // filtros: { cnpj, status } — a OCS lista só os dela pelo cnpj.

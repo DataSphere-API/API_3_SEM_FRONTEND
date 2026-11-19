@@ -1,4 +1,4 @@
-import { api } from './http.js'
+import { api } from './api.js'
 import { erroDeFormato, traduzirErro } from '../utils/erros.js'
 
 function temResumoMensal(fatura) {
