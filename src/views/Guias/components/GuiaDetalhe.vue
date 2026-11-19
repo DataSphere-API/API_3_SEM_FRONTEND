@@ -3,7 +3,8 @@ import { ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { api } from '../../../services/api.js'
 import LinhaDoTempo from '../../../components/LinhaDoTempo.vue'
-import { buscarQrCode } from '../../../services/guiasService.js'
+import { baixarDocumentoDaGuia, buscarQrCode } from '../../../services/guiasService.js'
+import { salvarArquivo } from '../../../utils/download.js'
 import {
   alertaValidade,
   resumoSessoes,
@@ -29,6 +30,21 @@ const qrs = ref({})
 const ampliado = ref(null)
 const linhaDoTempo = ref(null)
 const erroDoHistorico = ref('')
+const baixandoPdf = ref(false)
+const erroPdf = ref('')
+
+async function baixarPdf() {
+  erroPdf.value = ''
+  baixandoPdf.value = true
+  try {
+    const arquivo = await baixarDocumentoDaGuia(props.guia.id)
+    salvarArquivo(arquivo, `guia-${props.guia.numero || props.guia.id}.pdf`)
+  } catch (erro) {
+    erroPdf.value = erro.mensagemUsuario || 'Não foi possível baixar o PDF da guia.'
+  } finally {
+    baixandoPdf.value = false
+  }
+}
 
 async function carregarQr(guiaAtual, atendimentoId) {
   qrs.value = {
@@ -85,6 +101,7 @@ watch([() => props.aberto, () => props.guia], async ([aberto, guia], anterior, c
   carregarQrs()
   linhaDoTempo.value = null
   erroDoHistorico.value = ''
+  erroPdf.value = ''
   if (!aberto || !guia?.id) return
 
   const controle = new AbortController()
@@ -185,9 +202,21 @@ function baixar(proc) {
 
           <p v-else-if="situacao(proc).mensagem" class="fx-alerta fx-alerta-cinza">{{ situacao(proc).mensagem }}</p>
         </section>
+
+        <section class="fx-cartao">
+          <h3 class="fx-secao-titulo">Histórico da guia</h3>
+          <p v-if="erroDoHistorico" class="fx-suave">{{ erroDoHistorico }}</p>
+          <LinhaDoTempo v-else-if="linhaDoTempo" :linha-do-tempo="linhaDoTempo" />
+          <p v-else class="fx-suave">Carregando histórico...</p>
+        </section>
+
+        <p v-if="erroPdf" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroPdf }}</p>
       </div>
 
       <footer class="fx-modal-rodape">
+        <button type="button" class="fx-botao" :disabled="baixandoPdf" @click="baixarPdf">
+          {{ baixandoPdf ? 'Baixando...' : 'Baixar PDF da guia' }}
+        </button>
         <button type="button" class="fx-botao-secundario" @click="$emit('fechar')">
           Voltar
         </button>
@@ -199,8 +228,6 @@ function baixar(proc) {
         <strong>{{ ampliado.titulo }}</strong>
         <img :src="ampliado.imagem" :alt="'QR Code ampliado de ' + ampliado.titulo" />
         <button type="button" class="fx-botao" @click="ampliado = null">Fechar</button>
-        <p v-if="erroDoHistorico" class="fx-suave">{{ erroDoHistorico }}</p>
-        <LinhaDoTempo v-else-if="linhaDoTempo" :linha-do-tempo="linhaDoTempo" />
       </div>
     </div>
   </div>

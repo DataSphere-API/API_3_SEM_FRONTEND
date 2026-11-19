@@ -1,5 +1,6 @@
 import { api } from './api.js'
 import { erroDeFormato, traduzirErro } from '../utils/erros.js'
+import { lerErroDeBlob } from '../utils/download.js'
 
 function normalizarProcedimento(procedimento) {
   const dados = procedimento && typeof procedimento === 'object' ? procedimento : {}
@@ -67,5 +68,19 @@ export async function buscarQrCode(atendimentoId) {
     return normalizarQrCode(data)
   } catch (erro) {
     throw traduzirErro(erro, { 404: 'QR Code não encontrado para este procedimento.' })
+  }
+}
+
+// GET /guias/{id}/documento: PDF guardado na emissão (beneficiário dono, emissor e chefe).
+export async function baixarDocumentoDaGuia(guiaId) {
+  try {
+    const { data } = await api.get(`/guias/${encodeURIComponent(guiaId)}/documento`, { responseType: 'blob' })
+    return data
+  } catch (erro) {
+    throw traduzirErro(await lerErroDeBlob(erro), {
+      403: 'Você não tem acesso ao documento desta guia.',
+      404: 'O PDF desta guia não está disponível.',
+      padrao: 'Não foi possível baixar o PDF da guia.'
+    })
   }
 }
