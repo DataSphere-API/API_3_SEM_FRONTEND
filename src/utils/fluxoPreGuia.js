@@ -7,7 +7,10 @@ const STATUS = {
   EMITIDA: { texto: 'Guia emitida', classe: 'fx-selo-azul' }
 }
 
-export const EDITAVEIS = ['PRE_GUIA', 'COM_PENDENCIAS']
+// A reprovada pode ser editada: ao salvar ela volta a rascunho e precisa de nova aprovação.
+export const EDITAVEIS = ['PRE_GUIA', 'COM_PENDENCIAS', 'REPROVADA']
+// Só rascunho e com pendências são enviados direto; a reprovada passa antes pela edição.
+export const ENVIAVEIS = ['PRE_GUIA', 'COM_PENDENCIAS']
 
 export function seloStatus(status) {
   return STATUS[status] || { texto: status, classe: 'fx-selo-cinza' }

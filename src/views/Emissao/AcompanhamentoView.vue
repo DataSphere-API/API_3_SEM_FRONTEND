@@ -11,7 +11,7 @@ import {
 } from '../../services/fluxoPreGuiaService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
-import { EDITAVEIS, numeroPreGuia, seloAprovacao, seloStatus } from '../../utils/fluxoPreGuia.js'
+import { EDITAVEIS, ENVIAVEIS, numeroPreGuia, seloAprovacao, seloStatus } from '../../utils/fluxoPreGuia.js'
 
 const route = useRoute()
 
@@ -69,6 +69,7 @@ const lista = computed(() => {
 })
 
 const comPendencias = computed(() => preGuias.value.filter(p => p.status === 'COM_PENDENCIAS').length)
+const reprovadas = computed(() => preGuias.value.filter(p => p.status === 'REPROVADA').length)
 
 async function carregar() {
   carregando.value = true
@@ -143,6 +144,9 @@ onMounted(carregar)
       <p v-if="aviso" class="fx-alerta" :class="`fx-alerta-${avisoTom}`" role="status">{{ aviso }}</p>
       <p v-if="comPendencias" class="fx-alerta fx-alerta-ambar">
         {{ comPendencias }} pré-guia(s) com pendências aguardando sua correção.
+      </p>
+      <p v-if="reprovadas" class="fx-alerta fx-alerta-ambar">
+        {{ reprovadas }} pré-guia(s) reprovada(s). Abra os detalhes, veja o motivo e use "Editar e reenviar".
       </p>
 
       <div class="barra-controles">
@@ -250,12 +254,13 @@ onMounted(carregar)
             <router-link
               v-if="EDITAVEIS.includes(detalhe.status)"
               :to="`/emissor/pre-guias/${detalhe.id}/editar`"
-              class="fx-botao-secundario link-botao"
+              class="link-botao"
+              :class="detalhe.status === 'REPROVADA' ? 'fx-botao' : 'fx-botao-secundario'"
             >
-              Editar
+              {{ detalhe.status === 'REPROVADA' ? 'Editar e reenviar' : 'Editar' }}
             </router-link>
             <button
-              v-if="EDITAVEIS.includes(detalhe.status)"
+              v-if="ENVIAVEIS.includes(detalhe.status)"
               type="button"
               class="fx-botao"
               :class="{ 'btn-destaque-atencao': detalhe.status === 'COM_PENDENCIAS' }"
