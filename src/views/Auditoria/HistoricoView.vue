@@ -135,7 +135,7 @@ onMounted(async () => {
           </div>
           <section class="fx-cartao">
             <h2 class="fx-secao-titulo">
-              Guia <span class="fx-mono">{{ numeroGuia(guiaAberta.guiaId) }}</span> · {{ guiaAberta.beneficiarioNome }}
+              Guia <span class="fx-mono">{{ guiaAberta.guiaNumero || numeroGuia(guiaAberta.guiaId) }}</span> · {{ guiaAberta.beneficiarioNome }}
             </h2>
             <p class="fx-suave">
               Emitida em {{ formatarData(guiaAberta.dataEmissao) }} · {{ guiaAberta.qtdProcedimentos }} procedimento(s)
@@ -152,7 +152,7 @@ onMounted(async () => {
           <ul class="fx-lista">
             <li v-for="g in guias" :key="g.guiaId">
               <button type="button" class="fx-cartao item" @click="abrirGuia(g)">
-                <span><strong class="fx-mono">{{ numeroGuia(g.guiaId) }}</strong> · {{ g.beneficiarioNome }}</span>
+                <span><strong class="fx-mono">{{ g.guiaNumero || numeroGuia(g.guiaId) }}</strong> · {{ g.beneficiarioNome }}</span>
                 <span class="fx-suave">
                   {{ g.qtdProcedimentos }} procedimento(s) · {{ formatarMoeda(g.valorTotal) }} · emitida em {{ formatarData(g.dataEmissao) }}
                 </span>
