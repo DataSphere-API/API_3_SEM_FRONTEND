@@ -4,7 +4,6 @@ import CriarEspelhoView from '../views/Espelhos/CriarEspelhoView.vue'
 import CorrigirEspelhoView from '../views/Espelhos/CorrigirEspelhoView.vue'
 import MinhasGuiasView from '../views/Guias/MinhasGuiasView.vue'
 import AtendimentoView from '../views/Atendimentos/AtendimentoView.vue'
-import PreGuiasView from '../views/PreGuias/PreGuiasView.vue'
 import LoginView from '../views/Acesso/LoginView.vue'
 import EscolherPerfilView from '../views/Acesso/EscolherPerfilView.vue'
 import CadastroBeneficiarioView from '../views/Acesso/CadastroBeneficiarioView.vue'
@@ -16,7 +15,6 @@ import SolicitacaoView from '../views/Emissao/SolicitacaoView.vue'
 import AcompanhamentoView from '../views/Emissao/AcompanhamentoView.vue'
 import AprovadasView from '../views/Emissao/AprovadasView.vue'
 import AtendimentosOcsView from '../views/Atendimentos/AtendimentosOcsView.vue'
-import ConfirmarAtendimentoView from '../views/Guias/ConfirmarAtendimentoView.vue'
 import EspelhosRecebidosView from '../views/Auditoria/EspelhosRecebidosView.vue'
 import HistoricoView from '../views/Auditoria/HistoricoView.vue'
 import FaturasMensaisView from '../views/Auditoria/FaturasMensaisView.vue'
@@ -42,20 +40,17 @@ const routes = [
   { path: '/auditor/faturas', name: 'faturas', component: FaturasMensaisView, meta: { perfis: ['AUDITOR'] } },
   { path: '/beneficiario/minhas-guias', name: 'minhas-guias', component: MinhasGuiasView, meta: { perfis: ['BENEFICIARIO'] } },
   { path: '/ocs/atendimento-qr', name: 'atendimento', component: AtendimentoView, meta: { perfis: ['OCS'] } },
-  { path: '/chefe/pre-guias', name: 'pre-guias', component: PreGuiasView, meta: { perfis: ['CHEFE'] } },
 
   { path: '/chefe/aprovacao', name: 'aprovacao-chefe', component: AprovacaoView, meta: { perfis: ['CHEFE'] } },
   { path: '/medico/aprovacao', name: 'aprovacao-medico', component: AprovacaoView, meta: { perfis: ['MEDICO'] } },
   { path: '/chefe/usuarios', name: 'usuarios', component: UsuariosView, meta: { perfis: ['CHEFE'] } },
   { path: '/chefe/ocs', name: 'ocs', component: OcsView, meta: { perfis: ['CHEFE'] } },
   { path: '/chefe/contratos', name: 'contratos', component: ContratosView, meta: { perfis: ['CHEFE'] } },
-  { path: '/medico/nova-solicitacao', name: 'nova-solicitacao', component: SolicitacaoView, meta: { perfis: ['MEDICO'] } },
   { path: '/emissor/pre-guias/nova', name: 'criar-pre-guia', component: SolicitacaoView, meta: { perfis: ['EMISSOR'] } },
   { path: '/emissor/pre-guias/:id/editar', name: 'editar-pre-guia', component: SolicitacaoView, meta: { perfis: ['EMISSOR'] } },
   { path: '/emissor/acompanhamento', name: 'acompanhamento', component: AcompanhamentoView, meta: { perfis: ['EMISSOR'] } },
   { path: '/emissor/aprovadas', name: 'aprovadas', component: AprovadasView, meta: { perfis: ['EMISSOR'] } },
   { path: '/ocs/atendimentos', name: 'atendimentos-ocs', component: AtendimentosOcsView, meta: { perfis: ['OCS'] } },
-  { path: '/beneficiario/confirmar-atendimento', name: 'confirmar-atendimento', component: ConfirmarAtendimentoView, meta: { perfis: ['BENEFICIARIO'] } },
   { path: '/auditor/espelhos', name: 'espelhos-recebidos', component: EspelhosRecebidosView, meta: { perfis: ['AUDITOR'] } },
   { path: '/auditor/historico', name: 'historico', component: HistoricoView, meta: { perfis: ['AUDITOR'] } },
 

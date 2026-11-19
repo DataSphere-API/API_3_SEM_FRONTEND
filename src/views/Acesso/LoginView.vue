@@ -15,13 +15,16 @@ const carregando = ref(false)
 const erro = ref('')
 const errosCampo = ref({})
 
-const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+const MOSTRAR_USUARIOS_TESTE = import.meta.env.DEV
 const usuariosTeste = [
   { perfil: 'Chefe do FUSEx', cpf: '526.018.159-06' },
-  { perfil: 'Médico', cpf: '083.016.613-05' },
+  { perfil: 'Médico (médico 1)', cpf: '083.016.613-05' },
+  { perfil: 'Médico (médico 2)', cpf: '731.406.285-44' },
   { perfil: 'Emissor', cpf: '186.091.390-34' },
   { perfil: 'Auditor', cpf: '996.030.824-30' },
-  { perfil: 'OCS', cpf: '628.194.821-12' },
+  { perfil: 'OCS · Clínica X', cpf: '628.194.821-12' },
+  { perfil: 'OCS · Hospital Y', cpf: '450.918.362-33' },
+  { perfil: 'OCS · Laboratório Z', cpf: '286.753.104-71' },
   { perfil: 'Beneficiário', cpf: '993.518.190-19' }
 ]
 
@@ -118,8 +121,8 @@ async function entrar() {
         <router-link to="/cadastro">Cadastre-se</router-link>
       </p>
 
-      <details v-if="USAR_MOCK" class="teste">
-        <summary>Usuários de teste (modo mock)</summary>
+      <details v-if="MOSTRAR_USUARIOS_TESTE" class="teste">
+        <summary>Usuários de teste (desenvolvimento)</summary>
         <p class="fx-suave">
           Senha de todos: <span class="fx-mono">fusex123</span>. Militares da equipe também são beneficiários,
           então escolhem o perfil depois de entrar.

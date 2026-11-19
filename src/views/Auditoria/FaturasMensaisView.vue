@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { listarFaturasMensais, buscarFaturaMensal, encaminharFaturaMensal } from '../../services/faturaMensalService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData, formatarDataHora } from '../../utils/documentos.js'
-import { fimDoPrazoDeEnvio, prazoDeEnvioEncerrado, rotuloCompetencia } from '../../utils/competencia.js'
+import { rotuloCompetencia } from '../../utils/competencia.js'
 import { avaliarCobranca, pontuacaoDoEspelho, classeDaPontuacao } from '../../utils/pontuacao.js'
 
 const faturas = ref([])
@@ -31,19 +31,10 @@ const itensDaAberta = computed(() =>
 
 function situacao(fatura) {
   if (fatura.status === 'ENCAMINHADA_APROVACAO') return { texto: 'Encaminhada', classe: 'fx-selo-azul' }
-  if (!prazoDeEnvioEncerrado(fatura.competencia)) return { texto: 'Recebendo espelhos', classe: 'fx-selo-cinza' }
+  if (fatura.status !== 'ATIVA') return { texto: fatura.status, classe: 'fx-selo-cinza' }
+  if (fatura.podeEncaminhar === true) return { texto: 'Pronta para encaminhar', classe: 'fx-selo-verde' }
   if (fatura.espelhosPendentes) return { texto: 'Aguardando espelhos', classe: 'fx-selo-ambar' }
-  return { texto: 'Pronta para encaminhar', classe: 'fx-selo-verde' }
-}
-
-// Motivo de não poder encaminhar ainda (ou null quando pode).
-function bloqueio(fatura) {
-  if (fatura.status !== 'ATIVA') return null
-  if (!prazoDeEnvioEncerrado(fatura.competencia)) {
-    return `A OCS pode mandar espelhos de ${rotuloCompetencia(fatura.competencia)} até ${formatarData(fimDoPrazoDeEnvio(fatura.competencia))}. A fatura pode ser encaminhada depois disso.`
-  }
-  if (fatura.espelhosPendentes) return `Ainda há ${fatura.espelhosPendentes} espelho(s) deste mês na auditoria ou em correção pela OCS.`
-  return null
+  return { texto: 'Em aberto', classe: 'fx-selo-cinza' }
 }
 
 async function carregar() {
@@ -59,6 +50,7 @@ async function carregar() {
 }
 
 async function abrir(id) {
+  erro.value = ''
   aviso.value = ''
   erroAcao.value = ''
   try {
@@ -69,6 +61,7 @@ async function abrir(id) {
 }
 
 async function encaminhar() {
+  if (aberta.value?.podeEncaminhar !== true || encaminhando.value) return
   erroAcao.value = ''
   encaminhando.value = true
   try {
@@ -155,7 +148,7 @@ onMounted(carregar)
 
       <template v-else>
         <div>
-          <button type="button" class="fx-botao-secundario" @click="aberta = null">← Voltar para as faturas</button>
+          <button type="button" class="fx-botao-secundario" :disabled="encaminhando" @click="aberta = null">← Voltar para as faturas</button>
         </div>
 
         <article class="fx-cartao">
@@ -234,12 +227,12 @@ onMounted(carregar)
 
         <section v-if="aberta.status === 'ATIVA'" class="fx-cartao">
           <p v-if="erroAcao" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroAcao }}</p>
-          <p v-if="bloqueio(aberta)" class="fx-alerta fx-alerta-cinza">{{ bloqueio(aberta) }}</p>
-          <div>
-            <button type="button" class="fx-botao" :disabled="encaminhando || Boolean(bloqueio(aberta))" @click="encaminhar">
+          <div v-if="aberta.podeEncaminhar === true">
+            <button type="button" class="fx-botao" :disabled="encaminhando" @click="encaminhar">
               {{ encaminhando ? 'Encaminhando...' : 'Encaminhar para aprovação' }}
             </button>
           </div>
+          <p v-else class="fx-suave">A fatura ainda não está disponível para encaminhamento.</p>
         </section>
       </template>
     </div>

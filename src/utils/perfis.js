@@ -12,10 +12,9 @@ export const PERFIS = {
   },
   MEDICO: {
     rotulo: 'Médico',
-    descricao: 'Criar solicitações de exame e aprovar pré-guias.',
+    descricao: 'Aprovar as pré-guias em que é o médico responsável.',
     rotaInicial: '/medico/aprovacao',
     menu: [
-      { rotulo: 'Nova solicitação', rota: '/medico/nova-solicitacao' },
       { rotulo: 'Pré-guias para aprovar', rota: '/medico/aprovacao' }
     ]
   },
@@ -31,10 +30,9 @@ export const PERFIS = {
   },
   BENEFICIARIO: {
     rotulo: 'Beneficiário',
-    descricao: 'Confirmar os atendimentos e acompanhar suas guias.',
-    rotaInicial: '/beneficiario/confirmar-atendimento',
+    descricao: 'Acompanhar suas guias e mostrar o QR Code na OCS.',
+    rotaInicial: '/beneficiario/minhas-guias',
     menu: [
-      { rotulo: 'Confirmar atendimento', rota: '/beneficiario/confirmar-atendimento' },
       { rotulo: 'Minhas guias', rota: '/beneficiario/minhas-guias' }
     ]
   },
@@ -50,10 +48,11 @@ export const PERFIS = {
   },
   OCS: {
     rotulo: 'OCS',
-    descricao: 'Dar baixa nos atendimentos e enviar espelhos.',
+    descricao: 'Registrar sessões, dar a baixa por QR e enviar espelhos.',
     rotaInicial: '/ocs/atendimentos',
     menu: [
       { rotulo: 'Atendimentos', rota: '/ocs/atendimentos' },
+      { rotulo: 'Baixa por QR', rota: '/ocs/atendimento-qr' },
       { rotulo: 'Espelhos', rota: '/ocs/espelhos' }
     ]
   }

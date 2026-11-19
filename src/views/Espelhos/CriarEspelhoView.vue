@@ -2,7 +2,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { criarEspelho } from '../../services/espelhoService.js'
-import { listarAtendimentosDaOcs } from '../../services/checkMutuoService.js'
 import { sessao } from '../../stores/sessao.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
@@ -19,7 +18,6 @@ import {
 const router = useRouter()
 const cnpj = sessao.usuario?.ocsCnpj || ''
 
-// O espelho é de um mês só e entra na fatura desse mês: o atual e, até o dia 5, também o anterior.
 const hoje = hojeIso()
 const abertas = competenciasAbertasParaEspelho()
 const mes = ref(abertas[abertas.length - 1])
@@ -40,7 +38,6 @@ const carregando = ref(false)
 const erro = ref('')
 const enviando = ref(false)
 
-// Realizados (beneficiário confirmou), sem espelho e com a última sessão dentro do período.
 const disponiveis = computed(() =>
   atendimentos.value.filter(a => {
     if (a.statusProcedimento !== 'REALIZADA' || a.espelhoId || !a.dataRealizacao) return false
@@ -49,7 +46,6 @@ const disponiveis = computed(() =>
   })
 )
 
-// Realizados em meses anteriores e que ficaram sem espelho: não entram mais.
 const deMesesAnteriores = computed(
   () =>
     atendimentos.value.filter(
@@ -64,10 +60,7 @@ async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    atendimentos.value = await listarAtendimentosDaOcs(cnpj)
-    atendimentos.value.forEach(a => {
-      if (selecionados.value[a.atendimentoId] === undefined) selecionados.value[a.atendimentoId] = true
-    })
+    atendimentos.value = []
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar os atendimentos.'
   } finally {
@@ -122,8 +115,7 @@ onMounted(carregar)
       <header>
         <h1 class="fx-titulo">Novo espelho</h1>
         <p class="fx-subtitulo">
-          O espelho junta os atendimentos de um mês e entra na fatura desse mês. Informe quanto a clínica cobra por
-          cada um.
+          O espelho junta os atendimentos de um mês e entra na fatura desse mês. Informe quanto a clínica cobra por cada um.
         </p>
       </header>
 
@@ -148,64 +140,15 @@ onMounted(carregar)
             <input v-model="dataFim" type="date" class="fx-entrada" :min="inicioDoMes" :max="fimDoMes" />
           </label>
         </div>
-        <p v-if="deMesesAnteriores" class="fx-alerta fx-alerta-ambar">
-          {{ deMesesAnteriores }} atendimento(s) de meses já fechados ficaram sem espelho e não podem mais
-          ser cobrados por aqui.
-        </p>
       </section>
 
       <section class="fx-cartao">
         <h2 class="fx-secao-titulo">2. Atendimentos realizados no período</h2>
-        <p class="fx-suave">
-          Só aparecem atendimentos confirmados pelo beneficiário e que ainda não estão em outro espelho.
-        </p>
-
+        <p class="fx-suave">Validação via QR Code ativa.</p>
         <p v-if="carregando" class="fx-alerta fx-alerta-cinza">Carregando atendimentos...</p>
         <p v-else-if="disponiveis.length === 0" class="fx-alerta fx-alerta-cinza">
           Nenhum atendimento realizado neste período.
         </p>
-
-        <div v-else class="fx-tabela-rolagem">
-          <table class="fx-tabela">
-            <thead>
-              <tr>
-                <th><span class="fx-suave">Incluir</span></th>
-                <th>Atendimento</th>
-                <th>Beneficiário</th>
-                <th>Procedimento</th>
-                <th>Realizado em</th>
-                <th>Valor cobrado (R$)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="a in disponiveis" :key="a.atendimentoId">
-                <td>
-                  <input
-                    v-model="selecionados[a.atendimentoId]"
-                    type="checkbox"
-                    class="marcar"
-                    :aria-label="`Incluir atendimento ${a.atendimentoId}`"
-                  />
-                </td>
-                <td class="fx-mono">{{ a.atendimentoId }}</td>
-                <td>{{ a.beneficiario.nome }} <span class="fx-suave fx-mono">· {{ a.beneficiario.precCp }}</span></td>
-                <td>{{ a.procedimento }}<span v-if="a.qtdAutorizada > 1" class="fx-suave"> · {{ a.qtdAutorizada }} sessões</span></td>
-                <td>{{ formatarData(a.dataRealizacao) }}</td>
-                <td>
-                  <input
-                    v-model="valores[a.atendimentoId]"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    class="fx-entrada campo-valor"
-                    :disabled="!selecionados[a.atendimentoId]"
-                    :aria-label="`Valor cobrado do atendimento ${a.atendimentoId}`"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
       </section>
 
       <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
@@ -224,31 +167,9 @@ onMounted(carregar)
 </template>
 
 <style scoped>
-.voltar {
-  color: var(--fx-verde);
-  font-weight: 600;
-}
-
-.marcar {
-  width: 20px;
-  height: 20px;
-}
-
-.campo-valor {
-  width: 140px;
-}
-
-.rodape {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.link-botao {
-  display: inline-flex;
-  align-items: center;
-  text-decoration: none;
-}
+.voltar { color: var(--fx-verde); font-weight: 600; }
+.marcar { width: 20px; height: 20px; }
+.campo-valor { width: 140px; }
+.rodape { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.link-botao { display: inline-flex; align-items: center; text-decoration: none; }
 </style>

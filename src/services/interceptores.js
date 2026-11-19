@@ -6,10 +6,6 @@ api.interceptors.request.use(config => {
     if (sessao.token) {
         config.headers.Authorization = `Bearer ${sessao.token}`
     }
-    // Provisório até o Spring Security (US000-6): o back identifica médico/chefe pelo Prec-CP.
-    if (sessao.usuario?.precCp) {
-        config.headers['X-Prec-Cp'] = sessao.usuario.precCp
-    }
     return config
 })
 

@@ -1,11 +1,9 @@
 <script setup>
 import { ref, watch } from 'vue'
 import QRCode from 'qrcode'
+import { api } from '../../../services/http.js'
+import LinhaDoTempo from '../../../components/LinhaDoTempo.vue'
 import { buscarQrCode } from '../../../services/guiasService.js'
-// 1. Importando a API e o seu novo componente
-import api from '../../../services/api'
-import LinhaDoTempo from './LinhaDoTempo.vue'
-
 import {
   alertaValidade,
   resumoSessoes,
@@ -29,31 +27,8 @@ defineEmits(['fechar'])
 
 const qrs = ref({})
 const ampliado = ref(null)
-
-// 2. Estados para a Linha do Tempo
-const linhaDoTempoDados = ref(null)
-const carregandoLinhaDoTempo = ref(false)
-const erroLinhaDoTempo = ref('')
-
-// Função que busca os dados no backend
-async function carregarLinhaDoTempo(guiaId) {
-  if (!guiaId) return
-
-  carregandoLinhaDoTempo.value = true
-  erroLinhaDoTempo.value = ''
-  linhaDoTempoDados.value = null
-
-  try {
-    // Chama o endpoint mapeado na US007-2
-    const response = await api.get(`/guias/${guiaId}/linha-do-tempo`)
-    linhaDoTempoDados.value = response.data
-  } catch (erro) {
-    console.error('Erro na linha do tempo:', erro)
-    erroLinhaDoTempo.value = 'Não foi possível carregar o histórico desta guia.'
-  } finally {
-    carregandoLinhaDoTempo.value = false
-  }
-}
+const linhaDoTempo = ref(null)
+const erroDoHistorico = ref('')
 
 async function carregarQr(guiaAtual, atendimentoId) {
   qrs.value = {
@@ -89,39 +64,41 @@ async function carregarQr(guiaAtual, atendimentoId) {
   }
 }
 
-const QR_NO_ESCOPO = false
-
 function carregarQrs() {
   qrs.value = {}
   ampliado.value = null
 
-  if (!QR_NO_ESCOPO || !props.aberto || !props.guia) {
+  if (!props.aberto || !props.guia) {
     return
   }
 
   const guiaAtual = props.guia
 
   guiaAtual.procedimentos.forEach(proc => {
-    if (situacaoQr(guiaAtual, proc).exibir) {
+    if (situacao(proc).exibir) {
       carregarQr(guiaAtual, proc.atendimentoId)
     }
   })
 }
 
-// 3. Atualizando o Watch para buscar os QR Codes e a Linha do Tempo quando abrir o modal
-watch([() => props.aberto, () => props.guia], () => {
+watch([() => props.aberto, () => props.guia], async ([aberto, guia], anterior, cancelar) => {
   carregarQrs()
+  linhaDoTempo.value = null
+  erroDoHistorico.value = ''
+  if (!aberto || !guia?.id) return
 
-  if (props.aberto && props.guia) {
-    // ATENÇÃO: Verifique se o ID da guia no frontend é props.guia.id ou props.guia.guiaId
-    carregarLinhaDoTempo(props.guia.id || props.guia.guiaId)
-  } else {
-    linhaDoTempoDados.value = null
+  const controle = new AbortController()
+  cancelar(() => controle.abort())
+  try {
+    const { data } = await api.get(`/guias/${guia.id}/linha-do-tempo`, { signal: controle.signal })
+    linhaDoTempo.value = Array.isArray(data) ? { eventos: data } : data
+  } catch {
+    if (!controle.signal.aborted) erroDoHistorico.value = 'Histórico da guia indisponível.'
   }
 }, { immediate: true })
 
 function situacao(proc) {
-  if (!QR_NO_ESCOPO) return { exibir: false, mensagem: '' }
+  if (proc.temQr === false) return { exibir: false, mensagem: 'QR Code indisponível para este procedimento.' }
   return situacaoQr(props.guia, proc)
 }
 
@@ -168,8 +145,8 @@ function baixar(proc) {
         <section v-for="(proc, i) in guia.procedimentos" :key="i" class="fx-cartao">
           <div class="proc-topo">
             <strong>{{ proc.descricao }}</strong>
-            <span class="fx-selo" :class="'fx-selo-' + tomStatus(proc.status)">
-              {{ rotuloStatus(proc.status) }}
+            <span class="fx-selo" :class="'fx-selo-' + tomStatus(proc.statusPainel)">
+              {{ rotuloStatus(proc.statusPainel) }}
             </span>
           </div>
 
@@ -208,20 +185,6 @@ function baixar(proc) {
 
           <p v-else-if="situacao(proc).mensagem" class="fx-alerta fx-alerta-cinza">{{ situacao(proc).mensagem }}</p>
         </section>
-
-        <!-- 4. Nova seção da Linha do Tempo -->
-        <div class="linha-tempo-secao">
-          <hr class="divisor" />
-          <h3>Histórico da Guia</h3>
-
-          <p v-if="carregandoLinhaDoTempo" class="fx-suave">Carregando histórico...</p>
-          <p v-else-if="erroLinhaDoTempo" class="fx-alerta fx-alerta-vermelho">{{ erroLinhaDoTempo }}</p>
-          <LinhaDoTempo
-            v-else-if="linhaDoTempoDados"
-            :linhaDoTempo="linhaDoTempoDados"
-          />
-        </div>
-
       </div>
 
       <footer class="fx-modal-rodape">
@@ -236,6 +199,8 @@ function baixar(proc) {
         <strong>{{ ampliado.titulo }}</strong>
         <img :src="ampliado.imagem" :alt="'QR Code ampliado de ' + ampliado.titulo" />
         <button type="button" class="fx-botao" @click="ampliado = null">Fechar</button>
+        <p v-if="erroDoHistorico" class="fx-suave">{{ erroDoHistorico }}</p>
+        <LinhaDoTempo v-else-if="linhaDoTempo" :linha-do-tempo="linhaDoTempo" />
       </div>
     </div>
   </div>
@@ -286,21 +251,5 @@ function baixar(proc) {
 .ampliado-caixa img {
   width: min(80vw, 360px);
   height: auto;
-}
-
-/* 5. Estilos para a seção da Linha do Tempo */
-.linha-tempo-secao {
-  margin-top: 1.5rem;
-}
-
-.divisor {
-  border: none;
-  border-top: 1px solid var(--fx-borda, #e5e7eb);
-  margin-bottom: 1.5rem;
-}
-
-.linha-tempo-secao h3 {
-  margin-bottom: 1rem;
-  color: var(--fx-texto);
 }
 </style>

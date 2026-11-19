@@ -2,9 +2,9 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import LinhaDoTempo from '../../components/LinhaDoTempo.vue'
-import { listarPreGuiasDoFluxo } from '../../services/fluxoPreGuiaService.js'
+import { api } from '../../services/http.js'
+import { traduzirErro } from '../../utils/erros.js'
 import { listarEspelhos, historicoDoEspelho } from '../../services/espelhoService.js'
-import { linhaDoTempoDaGuia } from '../../services/linhaDoTempoService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
 import { numeroGuia } from '../../utils/fluxoPreGuia.js'
@@ -18,6 +18,8 @@ const guiasSemId = ref(0)
 const espelhos = ref([])
 const carregando = ref(false)
 const erro = ref('')
+const erroGuias = ref('')
+const erroEspelhos = ref('')
 
 const guiaAberta = ref(null)
 const linhaDaGuia = ref([])
@@ -29,13 +31,24 @@ async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    const [listaPreGuias, listaEspelhos] = await Promise.all([
-      listarPreGuiasDoFluxo({ status: 'EMITIDA' }),
-      listarEspelhos()
+    erroGuias.value = ''
+    erroEspelhos.value = ''
+    const [listaPreGuias, listaEspelhos] = await Promise.allSettled([
+      api.get('/pre-guias', { params: { status: 'EMITIDA' } }),
+      listarEspelhos({})
     ])
-    guias.value = listaPreGuias.filter(g => g.guiaId != null).sort((a, b) => b.guiaId - a.guiaId)
-    guiasSemId.value = listaPreGuias.length - guias.value.length
-    espelhos.value = listaEspelhos.sort((a, b) => b.id - a.id)
+    if (listaPreGuias.status === 'fulfilled') {
+      const preGuias = listaPreGuias.value.data
+      guias.value = preGuias.filter(g => g.guiaId != null).sort((a, b) => b.guiaId - a.guiaId)
+      guiasSemId.value = preGuias.length - guias.value.length
+    } else {
+      erroGuias.value = traduzirErro(listaPreGuias.reason, { 403: 'Seu perfil não tem acesso à listagem de guias.' }).mensagemUsuario
+    }
+    if (listaEspelhos.status === 'fulfilled') {
+      espelhos.value = listaEspelhos.value.sort((a, b) => b.id - a.id)
+    } else {
+      erroEspelhos.value = listaEspelhos.reason?.mensagemUsuario || 'Não foi possível carregar os espelhos.'
+    }
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar.'
   } finally {
@@ -47,10 +60,11 @@ async function abrirGuia(guia) {
   carregandoHistorico.value = true
   erro.value = ''
   try {
-    linhaDaGuia.value = await linhaDoTempoDaGuia(guia.guiaId)
+    const { data } = await api.get(`/guias/${guia.guiaId}/linha-do-tempo`)
+    linhaDaGuia.value = Array.isArray(data) ? data : data.eventos ?? []
     guiaAberta.value = guia
   } catch (e) {
-    erro.value = e.mensagemUsuario || 'Não foi possível carregar a linha do tempo da guia.'
+    erro.value = traduzirErro(e, { 404: 'Histórico da guia indisponível.' }).mensagemUsuario
   } finally {
     carregandoHistorico.value = false
   }
@@ -111,6 +125,8 @@ onMounted(async () => {
 
       <p v-if="carregando || carregandoHistorico" class="fx-alerta fx-alerta-cinza">Carregando...</p>
       <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
+      <p v-if="aba === 'guias' && erroGuias" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroGuias }}</p>
+      <p v-if="aba === 'espelhos' && erroEspelhos" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroEspelhos }}</p>
 
       <template v-if="aba === 'guias' && !carregando">
         <template v-if="guiaAberta">
@@ -124,7 +140,7 @@ onMounted(async () => {
             <p class="fx-suave">
               Emitida em {{ formatarData(guiaAberta.dataEmissao) }} · {{ guiaAberta.qtdProcedimentos }} procedimento(s)
             </p>
-            <LinhaDoTempo :eventos="linhaDaGuia" />
+            <LinhaDoTempo :linha-do-tempo="{ eventos: linhaDaGuia }" />
           </section>
         </template>
 
@@ -158,7 +174,7 @@ onMounted(async () => {
             <p v-if="espelhoAberto.motivoReprovacao" class="fx-alerta fx-alerta-vermelho">
               <strong>Motivo da reprovação:</strong> {{ espelhoAberto.motivoReprovacao }}
             </p>
-            <LinhaDoTempo :eventos="historicoEspelho" />
+            <LinhaDoTempo :linha-do-tempo="{ eventos: historicoEspelho }" />
           </section>
         </template>
 

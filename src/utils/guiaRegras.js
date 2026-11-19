@@ -33,20 +33,21 @@ export function rotuloStatus(status) {
   return texto.charAt(0).toUpperCase() + texto.slice(1)
 }
 
+const TONS_STATUS = {
+  SOLICITADA: 'cinza',
+  EMITIDA: 'azul',
+  REALIZADA: 'verde',
+  FATURADA: 'ambar',
+  APROVADA: 'roxo',
+  LIQUIDADA: 'petroleo',
+  EXPIRADA: 'vermelho'
+}
+
 export function tomStatus(status) {
-  if (statusComecaCom(status, 'EXPIRAD')) {
-    return 'vermelho'
-  }
-
-  if (statusComecaCom(status, 'REALIZAD')) {
-    return 'verde'
-  }
-
-  if (!semAcento(status)) {
-    return 'cinza'
-  }
-
-  return 'azul'
+  const chave = semAcento(status)
+  if (chave.startsWith('EXPIRAD')) return 'vermelho'
+  if (chave.startsWith('REALIZAD')) return 'verde'
+  return TONS_STATUS[chave] || (chave ? 'azul' : 'cinza')
 }
 
 export function resumoSessoes(procedimento) {
@@ -91,6 +92,15 @@ export function situacaoQr(guia, procedimento) {
 
   if (statusComecaCom(procedimento?.status, 'REALIZAD')) {
     return { exibir: false, mensagem: 'Procedimento já realizado: QR Code indisponível.' }
+  }
+
+  if (['APROVADA', 'LIQUIDADA'].includes(semAcento(procedimento?.statusPainel))
+    || statusComecaCom(procedimento?.statusPainel ?? procedimento?.status, 'FATURAD')) {
+    return { exibir: false, mensagem: 'Procedimento já faturado: QR Code indisponível.' }
+  }
+
+  if (statusComecaCom(guia?.status, 'FINALIZAD')) {
+    return { exibir: false, mensagem: 'Guia finalizada: QR Code indisponível.' }
   }
 
   if (statusComecaCom(procedimento?.status, 'EXPIRAD')) {
