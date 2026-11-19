@@ -1,5 +1,6 @@
 import { api } from './api.js'
 import { traduzirErro } from '../utils/erros.js'
+import { lerErroDeBlob } from '../utils/download.js'
 
 export async function listarPreGuiasDoFluxo({ status, minhas } = {}) {
   try {
@@ -80,18 +81,6 @@ export async function emitirGuia(id) {
   }
 }
 
-
-async function lerErroDeBlob(erro) {
-  const dados = erro?.response?.data
-  if (dados instanceof Blob) {
-    try {
-      erro.response.data = JSON.parse(await dados.text())
-    } catch {
-      erro.response.data = null
-    }
-  }
-  return erro
-}
 
 const ERRO_DOWNLOAD = {
   404: 'Pré-guia não encontrada.',
