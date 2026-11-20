@@ -1,10 +1,17 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { listarFaturasMensais, buscarFaturaMensal, encaminharFaturaMensal } from '../../services/faturaMensalService.js'
+import {
+  listarFaturasMensais,
+  buscarFaturaMensal,
+  encaminharFaturaMensal,
+  buscarLisuraDaFatura,
+  buscarDivergenciasDaFatura,
+  aprovarFaturaMensal,
+  liquidarFaturaMensal
+} from '../../services/faturaMensalService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData, formatarDataHora } from '../../utils/documentos.js'
-import { fimDoPrazoDeEnvio, prazoDeEnvioEncerrado, rotuloCompetencia } from '../../utils/competencia.js'
-import { avaliarCobranca, pontuacaoDoEspelho, classeDaPontuacao } from '../../utils/pontuacao.js'
+import { rotuloCompetencia } from '../../utils/competencia.js'
 
 const faturas = ref([])
 const carregando = ref(false)
@@ -15,7 +22,16 @@ const filtroOcs = ref('')
 const aberta = ref(null)
 const erroAcao = ref('')
 const encaminhando = ref(false)
+const lisura = ref([])
+const divergencias = ref([])
+const totalDivergencia = ref(0)
+const decidindo = ref(false)
 
+const SEVERIDADE = {
+  BAIXA: { texto: 'Divergência baixa', classe: 'fx-selo-ambar' },
+  MEDIA: { texto: 'Divergência média', classe: 'fx-selo-ambar' },
+  ALTA: { texto: 'Divergência alta', classe: 'fx-selo-vermelho' }
+}
 const competencias = computed(() => [...new Set(faturas.value.map(f => f.competencia))].sort().reverse())
 const ocs = computed(() => [...new Map(faturas.value.map(f => [f.ocsId, f.ocsNome])).entries()])
 
@@ -25,25 +41,28 @@ const lista = computed(() =>
     .sort((a, b) => b.competencia.localeCompare(a.competencia) || a.ocsNome.localeCompare(b.ocsNome))
 )
 
-const itensDaAberta = computed(() =>
-  (aberta.value?.espelhos || []).flatMap(e => e.itens).map(i => ({ valor: i.valorApresentado, valorContratado: i.valorContratado }))
-)
+// Resultado do back para cada item (lisura e divergência), pelo id do item do espelho.
+function avaliacaoDoItem(espelhoItemId) {
+  const itemLisura = lisura.value.find(i => i.espelhoItemId === espelhoItemId)
+  const itemDivergencia = divergencias.value.find(i => i.espelhoItemId === espelhoItemId)
+  return {
+    autorizado: itemLisura?.autorizado === true,
+    motivo: itemLisura?.motivo || '',
+    divergencia: itemDivergencia?.divergencia ?? null,
+    severidade: Number(itemDivergencia?.divergencia) > 0 ? SEVERIDADE[itemDivergencia.severidade] : null
+  }
+}
+
+const itensAutorizados = computed(() => lisura.value.filter(i => i.autorizado).length)
 
 function situacao(fatura) {
   if (fatura.status === 'ENCAMINHADA_APROVACAO') return { texto: 'Encaminhada', classe: 'fx-selo-azul' }
-  if (!prazoDeEnvioEncerrado(fatura.competencia)) return { texto: 'Recebendo espelhos', classe: 'fx-selo-cinza' }
+  if (fatura.status === 'APROVADA') return { texto: 'Aprovada', classe: 'fx-selo-roxo' }
+  if (fatura.status === 'LIQUIDADA') return { texto: 'Liquidada', classe: 'fx-selo-petroleo' }
+  if (fatura.status !== 'ATIVA') return { texto: fatura.status, classe: 'fx-selo-cinza' }
+  if (fatura.podeEncaminhar === true) return { texto: 'Pronta para encaminhar', classe: 'fx-selo-verde' }
   if (fatura.espelhosPendentes) return { texto: 'Aguardando espelhos', classe: 'fx-selo-ambar' }
-  return { texto: 'Pronta para encaminhar', classe: 'fx-selo-verde' }
-}
-
-// Motivo de não poder encaminhar ainda (ou null quando pode).
-function bloqueio(fatura) {
-  if (fatura.status !== 'ATIVA') return null
-  if (!prazoDeEnvioEncerrado(fatura.competencia)) {
-    return `A OCS pode mandar espelhos de ${rotuloCompetencia(fatura.competencia)} até ${formatarData(fimDoPrazoDeEnvio(fatura.competencia))}. A fatura pode ser encaminhada depois disso.`
-  }
-  if (fatura.espelhosPendentes) return `Ainda há ${fatura.espelhosPendentes} espelho(s) deste mês na auditoria ou em correção pela OCS.`
-  return null
+  return { texto: 'Em aberto', classe: 'fx-selo-cinza' }
 }
 
 async function carregar() {
@@ -59,16 +78,26 @@ async function carregar() {
 }
 
 async function abrir(id) {
+  erro.value = ''
   aviso.value = ''
   erroAcao.value = ''
   try {
-    aberta.value = await buscarFaturaMensal(id)
+    const [fatura, resultadoLisura, resultadoDivergencias] = await Promise.all([
+      buscarFaturaMensal(id),
+      buscarLisuraDaFatura(id),
+      buscarDivergenciasDaFatura(id)
+    ])
+    lisura.value = resultadoLisura.itens
+    divergencias.value = resultadoDivergencias.itens
+    totalDivergencia.value = resultadoDivergencias.totalDivergencia
+    aberta.value = fatura
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível abrir a fatura.'
   }
 }
 
 async function encaminhar() {
+  if (aberta.value?.podeEncaminhar !== true || encaminhando.value) return
   erroAcao.value = ''
   encaminhando.value = true
   try {
@@ -81,6 +110,30 @@ async function encaminhar() {
   } finally {
     encaminhando.value = false
   }
+}
+
+async function decidir(acao, mensagem) {
+  if (decidindo.value) return
+  erroAcao.value = ''
+  decidindo.value = true
+  try {
+    await acao(aberta.value.id)
+    aviso.value = `Fatura de ${rotuloCompetencia(aberta.value.competencia)} da ${aberta.value.ocsNome} ${mensagem}.`
+    aberta.value = null
+    await carregar()
+  } catch (e) {
+    erroAcao.value = e.mensagemUsuario || 'Não foi possível concluir a operação.'
+  } finally {
+    decidindo.value = false
+  }
+}
+
+function aprovar() {
+  decidir(aprovarFaturaMensal, 'aprovada')
+}
+
+function liquidar() {
+  decidir(liquidarFaturaMensal, 'marcada como liquidada')
 }
 
 onMounted(carregar)
@@ -155,7 +208,7 @@ onMounted(carregar)
 
       <template v-else>
         <div>
-          <button type="button" class="fx-botao-secundario" @click="aberta = null">← Voltar para as faturas</button>
+          <button type="button" class="fx-botao-secundario" :disabled="encaminhando" @click="aberta = null">← Voltar para as faturas</button>
         </div>
 
         <article class="fx-cartao">
@@ -167,9 +220,9 @@ onMounted(carregar)
 
           <div class="placar">
             <div class="placar-item">
-              <span class="fx-suave">Pontuação da fatura</span>
-              <span class="fx-selo nota" :class="classeDaPontuacao(pontuacaoDoEspelho(itensDaAberta))">
-                {{ pontuacaoDoEspelho(itensDaAberta) }}/100
+              <span class="fx-suave">Lisura</span>
+              <span class="fx-selo nota" :class="itensAutorizados === lisura.length ? 'fx-selo-verde' : 'fx-selo-vermelho'">
+                {{ itensAutorizados }} de {{ lisura.length }} itens autorizados
               </span>
             </div>
             <div class="placar-item">
@@ -186,7 +239,15 @@ onMounted(carregar)
                 {{ formatarMoeda(aberta.valorApresentado - aberta.valorContratado) }}
               </strong>
             </div>
+            <div class="placar-item">
+              <span class="fx-suave">Divergência total</span>
+              <strong class="fx-mono" :class="{ acima: totalDivergencia > 0 }">{{ formatarMoeda(totalDivergencia) }}</strong>
+            </div>
           </div>
+
+          <p v-if="itensAutorizados < lisura.length" class="fx-alerta fx-alerta-vermelho">
+            Há itens não autorizados na lisura: a fatura não pode ser encaminhada enquanto eles estiverem nela.
+          </p>
 
           <p v-if="aberta.pendentes.length" class="fx-alerta fx-alerta-ambar">
             Espelhos deste mês ainda fora da fatura:
@@ -210,7 +271,7 @@ onMounted(carregar)
                   <th>Beneficiário</th>
                   <th>Contrato</th>
                   <th>Cobrado</th>
-                  <th>Pontuação</th>
+                  <th>Lisura</th>
                 </tr>
               </thead>
               <tbody>
@@ -220,11 +281,17 @@ onMounted(carregar)
                   <td class="fx-mono">{{ i.beneficiarioId }}</td>
                   <td class="fx-mono">{{ i.valorContratado === null ? '—' : formatarMoeda(i.valorContratado) }}</td>
                   <td class="fx-mono">{{ formatarMoeda(i.valorApresentado) }}</td>
-                  <td>
-                    <span class="fx-selo" :class="avaliarCobranca(i.valorApresentado, i.valorContratado).classe">
-                      {{ avaliarCobranca(i.valorApresentado, i.valorContratado).pontuacao }} ·
-                      {{ avaliarCobranca(i.valorApresentado, i.valorContratado).texto }}
+                  <td class="lisura">
+                    <span v-if="avaliacaoDoItem(i.espelhoItemId).autorizado" class="fx-selo fx-selo-verde">Autorizado</span>
+                    <span v-else class="fx-selo fx-selo-vermelho">Não autorizado</span>
+                    <span v-if="avaliacaoDoItem(i.espelhoItemId).severidade" class="fx-selo"
+                          :class="avaliacaoDoItem(i.espelhoItemId).severidade.classe">
+                      {{ avaliacaoDoItem(i.espelhoItemId).severidade.texto }} ·
+                      {{ formatarMoeda(avaliacaoDoItem(i.espelhoItemId).divergencia) }}
                     </span>
+                    <small v-if="avaliacaoDoItem(i.espelhoItemId).motivo" class="fx-suave">
+                      {{ avaliacaoDoItem(i.espelhoItemId).motivo }}
+                    </small>
                   </td>
                 </tr>
               </tbody>
@@ -234,12 +301,22 @@ onMounted(carregar)
 
         <section v-if="aberta.status === 'ATIVA'" class="fx-cartao">
           <p v-if="erroAcao" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroAcao }}</p>
-          <p v-if="bloqueio(aberta)" class="fx-alerta fx-alerta-cinza">{{ bloqueio(aberta) }}</p>
-          <div>
-            <button type="button" class="fx-botao" :disabled="encaminhando || Boolean(bloqueio(aberta))" @click="encaminhar">
+          <div v-if="aberta.podeEncaminhar === true">
+            <button type="button" class="fx-botao" :disabled="encaminhando" @click="encaminhar">
               {{ encaminhando ? 'Encaminhando...' : 'Encaminhar para aprovação' }}
             </button>
           </div>
+          <p v-else class="fx-suave">A fatura ainda não está disponível para encaminhamento.</p>
+        </section>
+
+        <section v-else-if="aberta.status === 'ENCAMINHADA_APROVACAO' || aberta.status === 'APROVADA'" class="fx-cartao">
+          <p v-if="erroAcao" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroAcao }}</p>
+          <button v-if="aberta.status === 'ENCAMINHADA_APROVACAO'" type="button" class="fx-botao" :disabled="decidindo" @click="aprovar">
+            {{ decidindo ? 'Aprovando...' : 'Aprovar fatura' }}
+          </button>
+          <button v-else type="button" class="fx-botao" :disabled="decidindo" @click="liquidar">
+            {{ decidindo ? 'Registrando...' : 'Registrar liquidação (pagamento)' }}
+          </button>
         </section>
       </template>
     </div>
@@ -287,5 +364,12 @@ onMounted(carregar)
 
 .acima {
   color: #a3261b;
+}
+
+.lisura {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
 }
 </style>

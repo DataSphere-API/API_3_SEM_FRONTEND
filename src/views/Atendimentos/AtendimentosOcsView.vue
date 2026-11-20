@@ -1,14 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { listarAtendimentosDaOcs, registrarSessao, cancelarSessao } from '../../services/checkMutuoService.js'
+import { ref, computed, onMounted } from 'vue'
+import { listarAtendimentosDaOcs, registrarSessao } from '../../services/atendimentoService.js'
 import { sessao } from '../../stores/sessao.js'
 import { formatarData } from '../../utils/documentos.js'
 
-const ATUALIZAR_A_CADA_MS = 8000
-
 const FILTROS = [
   { valor: 'ABERTOS', rotulo: 'A realizar' },
-  { valor: 'AGUARDANDO', rotulo: 'Aguardando beneficiário' },
   { valor: 'REALIZADA', rotulo: 'Realizados' },
   { valor: 'TODOS', rotulo: 'Todos' }
 ]
@@ -22,33 +19,35 @@ const erroAcao = ref('')
 const processando = ref(null)
 const busca = ref('')
 const filtro = ref('ABERTOS')
-let temporizador = null
+
+const ABERTOS = ['PENDENTE', 'EM_ANDAMENTO']
 
 const lista = computed(() => {
   const termo = busca.value.trim().toLowerCase()
   return atendimentos.value
     .filter(a => {
-      if (filtro.value === 'ABERTOS') return a.statusProcedimento !== 'REALIZADA' && !a.aguardandoConfirmacao
-      if (filtro.value === 'AGUARDANDO') return a.aguardandoConfirmacao
-      if (filtro.value === 'REALIZADA') return a.statusProcedimento === 'REALIZADA'
+      if (filtro.value === 'ABERTOS') return ABERTOS.includes(a.statusProcedimento)
+      if (filtro.value === 'REALIZADA') return a.statusProcedimento === 'REALIZADA' || a.statusProcedimento === 'FATURADA'
       return true
     })
-    .filter(
-      a =>
-        !termo ||
-        a.beneficiario.nome.toLowerCase().includes(termo) ||
-        a.beneficiario.precCp.includes(termo) ||
-        a.guiaNumero.toLowerCase().includes(termo)
-    )
+    .filter(a => {
+      if (!termo) return true
+      const nome = (a.beneficiario?.nome || '').toLowerCase()
+      const precCp = a.beneficiario?.precCp || ''
+      const procedimento = (a.procedimento || '').toLowerCase()
+      return nome.includes(termo) || precCp.includes(termo) || procedimento.includes(termo) || String(a.guiaId).includes(termo)
+    })
 })
 
-const aguardando = computed(() => atendimentos.value.filter(a => a.aguardandoConfirmacao).length)
+function podeRegistrarSessao(a) {
+  return ABERTOS.includes(a.statusProcedimento) && a.qtdRealizada < a.qtdAutorizada
+}
 
-async function carregar(silencioso = false) {
-  if (!silencioso) carregando.value = true
+async function carregar() {
+  carregando.value = true
+  erro.value = ''
   try {
     atendimentos.value = await listarAtendimentosDaOcs(cnpj)
-    erro.value = ''
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar os atendimentos.'
   } finally {
@@ -56,61 +55,49 @@ async function carregar(silencioso = false) {
   }
 }
 
-async function realizar(atendimento) {
+async function realizarSessao(atendimento) {
   aviso.value = ''
   erroAcao.value = ''
   processando.value = atendimento.atendimentoId
   try {
-    await registrarSessao(atendimento.atendimentoId, cnpj)
-    aviso.value = `Pedido enviado para ${atendimento.beneficiario.nome}. A sessão só conta depois que ele confirmar no app.`
-    await carregar(true)
+    const resposta = await registrarSessao(atendimento.atendimentoId)
+    aviso.value =
+      resposta.saldo > 0
+        ? `Sessão ${resposta.numeroSessao} registrada para ${atendimento.beneficiario.nome}. Faltam ${resposta.saldo}.`
+        : `Última sessão registrada. Peça ao beneficiário o QR Code para dar a baixa final.`
+    await carregar()
   } catch (e) {
-    erroAcao.value = e.mensagemUsuario || 'Não foi possível registrar o procedimento.'
-  } finally {
-    processando.value = null
-  }
-}
-
-async function cancelar(atendimento) {
-  aviso.value = ''
-  erroAcao.value = ''
-  processando.value = atendimento.atendimentoId
-  try {
-    await cancelarSessao(atendimento.atendimentoId)
-    aviso.value = 'Pedido de confirmação cancelado.'
-    await carregar(true)
-  } catch (e) {
-    erroAcao.value = e.mensagemUsuario || 'Não foi possível cancelar o pedido.'
+    erroAcao.value = e.mensagemUsuario || 'Não foi possível registrar a sessão.'
   } finally {
     processando.value = null
   }
 }
 
 function situacao(a) {
+  if (a.statusProcedimento === 'FATURADA') return { texto: 'Faturado', classe: 'fx-selo-azul' }
   if (a.statusProcedimento === 'REALIZADA') return { texto: 'Realizado', classe: 'fx-selo-verde' }
-  if (a.aguardandoConfirmacao) return { texto: 'Aguardando beneficiário', classe: 'fx-selo-ambar' }
+  if (a.statusProcedimento === 'EXPIRADA') return { texto: 'Guia vencida', classe: 'fx-selo-vermelho' }
+  if (a.qtdRealizada >= a.qtdAutorizada) return { texto: 'Aguardando QR', classe: 'fx-selo-ambar' }
   if (a.qtdRealizada > 0) return { texto: 'Em andamento', classe: 'fx-selo-azul' }
   return { texto: 'A realizar', classe: 'fx-selo-cinza' }
 }
 
 onMounted(() => {
-  carregar()
-  // Atualiza sozinho para a OCS ver a confirmação do beneficiário sem recarregar.
-  temporizador = setInterval(() => carregar(true), ATUALIZAR_A_CADA_MS)
+  if (cnpj) carregar()
 })
-
-onUnmounted(() => clearInterval(temporizador))
 </script>
 
 <template>
   <main class="fx-pagina">
     <div class="fx-conteudo fx-conteudo-largo">
-      <header>
-        <h1 class="fx-titulo">Atendimentos</h1>
-        <p class="fx-subtitulo">
-          Clique em <strong>Realizar procedimento</strong> na hora do atendimento. O beneficiário confirma
-          no app dele e só então a sessão conta.
-        </p>
+      <header class="fx-topo-pagina">
+        <div>
+          <h1 class="fx-titulo">Atendimentos</h1>
+          <p class="fx-subtitulo">
+            Registre cada sessão na hora do atendimento. Depois da última, a baixa final é feita com o QR Code do beneficiário.
+          </p>
+        </div>
+        <router-link to="/ocs/atendimento-qr" class="fx-botao link-botao">Baixa final por QR</router-link>
       </header>
 
       <p v-if="!cnpj" class="fx-alerta fx-alerta-vermelho" role="alert">
@@ -124,7 +111,7 @@ onUnmounted(() => clearInterval(temporizador))
         <div class="barra">
           <label class="fx-campo">
             Buscar
-            <input v-model="busca" class="fx-entrada" placeholder="Nome, Prec-CP ou nº da guia" />
+            <input v-model="busca" class="fx-entrada" placeholder="Nome, Prec-CP, procedimento ou nº da guia" />
           </label>
           <div class="filtros">
             <button
@@ -135,7 +122,7 @@ onUnmounted(() => clearInterval(temporizador))
               :class="{ 'filtro-ativo': filtro === f.valor }"
               @click="filtro = f.valor"
             >
-              {{ f.rotulo }}<template v-if="f.valor === 'AGUARDANDO' && aguardando"> ({{ aguardando }})</template>
+              {{ f.rotulo }}
             </button>
           </div>
         </div>
@@ -144,9 +131,6 @@ onUnmounted(() => clearInterval(temporizador))
         <p v-if="erro" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erro }}</p>
         <p v-if="!carregando && !erro && lista.length === 0" class="fx-alerta fx-alerta-cinza">
           Nenhum atendimento neste filtro.
-        </p>
-        <p v-if="filtro === 'REALIZADA'" class="fx-suave">
-          Para cobrar um atendimento realizado, use o número do atendimento em Espelhos → Novo espelho.
         </p>
 
         <ul v-if="!carregando && !erro" class="fx-lista">
@@ -162,41 +146,25 @@ onUnmounted(() => clearInterval(temporizador))
               {{ a.procedimento }}
               <span class="fx-suave">
                 · Atendimento <span class="fx-mono">{{ a.atendimentoId }}</span>
-                · Guia <span class="fx-mono">{{ a.guiaNumero }}</span>
+                · Guia <span class="fx-mono">{{ a.guiaId }}</span>
                 · válida até {{ formatarData(a.dataValidade) }}
               </span>
             </p>
             <div>
-              <div class="fx-suave">{{ a.qtdRealizada }}/{{ a.qtdAutorizada }} sessões confirmadas</div>
+              <div class="fx-suave">{{ a.qtdRealizada }}/{{ a.qtdAutorizada }} sessões</div>
               <div class="fx-progresso">
                 <div class="fx-progresso-preenchido" :style="{ width: `${(a.qtdRealizada / a.qtdAutorizada) * 100}%` }"></div>
               </div>
             </div>
 
-            <p v-if="a.aguardandoConfirmacao" class="fx-alerta fx-alerta-ambar">
-              <template v-if="a.qtdAutorizada > 1">Sessão {{ a.qtdRealizada + 1 }} registrada.</template>
-              <template v-else>Procedimento registrado.</template>
-              Aguardando o beneficiário confirmar no app.
-            </p>
-
-            <div v-if="a.statusProcedimento !== 'REALIZADA'" class="fx-acoes rodape">
+            <div v-if="podeRegistrarSessao(a)" class="fx-acoes rodape">
               <button
-                v-if="!a.aguardandoConfirmacao"
                 type="button"
                 class="fx-botao"
                 :disabled="processando === a.atendimentoId"
-                @click="realizar(a)"
+                @click="realizarSessao(a)"
               >
-                {{ processando === a.atendimentoId ? 'Enviando...' : a.qtdAutorizada > 1 ? `Realizar sessão ${a.qtdRealizada + 1}` : 'Realizar procedimento' }}
-              </button>
-              <button
-                v-else
-                type="button"
-                class="fx-botao-secundario fx-botao-perigo"
-                :disabled="processando === a.atendimentoId"
-                @click="cancelar(a)"
-              >
-                Cancelar pedido
+                {{ processando === a.atendimentoId ? 'Registrando...' : `Registrar sessão ${a.qtdRealizada + 1}` }}
               </button>
             </div>
           </li>
@@ -236,10 +204,15 @@ onUnmounted(() => clearInterval(temporizador))
 
 .linha {
   margin: 0;
+  line-height: 1.4;
 }
 
 .rodape {
   padding-top: 0.75rem;
   border-top: 1px solid var(--fx-borda);
+}
+
+.link-botao {
+  text-decoration: none;
 }
 </style>

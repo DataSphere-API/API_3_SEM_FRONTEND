@@ -4,7 +4,6 @@ import { listarEspelhos, listarItensEspelho, aprovarEspelho, reprovarEspelho } f
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData, formatarDataHora } from '../../utils/documentos.js'
 import { avaliarCobranca, pontuacaoDoEspelho, classeDaPontuacao } from '../../utils/pontuacao.js'
-import { rotuloCompetencia } from '../../utils/competencia.js'
 
 const STATUS = {
   EM_ABERTO: { texto: 'A auditar', classe: 'fx-selo-ambar' },
@@ -16,7 +15,7 @@ const STATUS = {
 
 const FILTROS = [
   { valor: 'EM_ABERTO', rotulo: 'A auditar' },
-  { valor: 'APROVADO', rotulo: 'Aprovados' },
+  { valor: 'APROVADO', rotulo: 'Aprovados e faturados' },
   { valor: 'REPROVADO', rotulo: 'Devolvidos à OCS' },
   { valor: '', rotulo: 'Todos' }
 ]
@@ -33,7 +32,13 @@ const reprovando = ref(false)
 const erroDecisao = ref('')
 const decidindo = ref(false)
 
-const lista = computed(() => (filtro.value ? espelhos.value.filter(e => e.status === filtro.value) : espelhos.value))
+// Aprovar já inclui o espelho na fatura do mês (FATURADO); o filtro de aprovados mostra os dois.
+const STATUS_DO_FILTRO = { APROVADO: ['APROVADO', 'FATURADO'] }
+const lista = computed(() => {
+  if (!filtro.value) return espelhos.value
+  const aceitos = STATUS_DO_FILTRO[filtro.value] || [filtro.value]
+  return espelhos.value.filter(e => aceitos.includes(e.status))
+})
 const aAuditar = computed(() => espelhos.value.filter(e => e.status === 'EM_ABERTO').length)
 
 const totalContratado = computed(() => itens.value.reduce((soma, i) => soma + (Number(i.valorContratado) || 0), 0))
@@ -49,7 +54,7 @@ async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    espelhos.value = (await listarEspelhos()).sort((a, b) => b.id - a.id)
+    espelhos.value = (await listarEspelhos({})).sort((a, b) => b.id - a.id)
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar os espelhos.'
   } finally {
@@ -59,6 +64,7 @@ async function carregar() {
 
 async function abrir(espelho) {
   aviso.value = ''
+  erro.value = ''
   erroDecisao.value = ''
   motivo.value = ''
   reprovando.value = false
@@ -74,8 +80,8 @@ async function aprovar() {
   erroDecisao.value = ''
   decidindo.value = true
   try {
-    const resposta = await aprovarEspelho(selecionado.value.id)
-    aviso.value = `Espelho #${selecionado.value.id} aprovado e incluído na fatura de ${rotuloCompetencia(resposta.competencia)} da ${selecionado.value.ocsNome}.`
+    await aprovarEspelho(selecionado.value.id)
+    aviso.value = `Espelho #${selecionado.value.id} aprovado e incluído na fatura do mês.`
     selecionado.value = null
     await carregar()
   } catch (e) {
@@ -93,7 +99,7 @@ async function reprovar() {
   }
   decidindo.value = true
   try {
-    await reprovarEspelho(selecionado.value.id, motivo.value)
+    await reprovarEspelho(selecionado.value.id, motivo.value.trim())
     aviso.value = `Espelho #${selecionado.value.id} reprovado e devolvido à OCS para correção.`
     selecionado.value = null
     await carregar()
@@ -174,7 +180,7 @@ onMounted(carregar)
 
       <template v-else>
         <div>
-          <button type="button" class="fx-botao-secundario" @click="selecionado = null">← Voltar para a lista</button>
+          <button type="button" class="fx-botao-secundario" :disabled="decidindo" @click="selecionado = null">← Voltar para a lista</button>
         </div>
 
         <article class="fx-cartao">
@@ -238,7 +244,7 @@ onMounted(carregar)
                   <td class="fx-mono">{{ i.atendimentoId }}</td>
                   <td>{{ i.descricao }}</td>
                   <td class="fx-mono">{{ i.beneficiarioId }}</td>
-                  <td class="fx-mono">{{ i.valorContratado === null ? '—' : formatarMoeda(i.valorContratado) }}</td>
+                  <td class="fx-mono">{{ i.valorContratado == null ? '—' : formatarMoeda(i.valorContratado) }}</td>
                   <td class="fx-mono">{{ formatarMoeda(i.valor) }}</td>
                   <td class="fx-mono" :class="{ acima: avaliarCobranca(i.valor, i.valorContratado).diferenca > 0 }">
                     <template v-if="avaliarCobranca(i.valor, i.valorContratado).diferenca === null">—</template>
