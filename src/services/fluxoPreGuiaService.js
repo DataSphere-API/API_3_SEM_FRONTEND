@@ -1,100 +1,107 @@
-import { api } from './http.js'
-import {
-  mockListarPreGuias,
-  mockBuscarPreGuia,
-  mockCriarPreGuia,
-  mockEditarPreGuia,
-  mockValidarPreGuia,
-  mockAprovarPreGuia,
-  mockReprovarPreGuia,
-  mockEmitirGuia
-} from '../mocks/fluxoPreGuiaMock.js'
+import { api } from './api.js'
 import { traduzirErro } from '../utils/erros.js'
+import { lerErroDeBlob } from '../utils/download.js'
 
-const USAR_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-
-// #75 — resumo. Para o MEDICO o back devolve só as pré-guias em que ele é o responsável.
-export async function listarPreGuiasDoFluxo(filtros = {}) {
+export async function listarPreGuiasDoFluxo({ status, minhas } = {}) {
   try {
-    if (USAR_MOCK) return await mockListarPreGuias(filtros)
-    const response = await api.get('/pre-guias', { params: filtros })
-    return response.data
+    const params = {}
+    if (status) params.status = status
+    if (minhas) params.minhas = true
+    const { data } = await api.get('/pre-guias', { params })
+    return data
   } catch (erro) {
-    throw traduzirErro(erro, { 400: 'Status inválido.' })
+    throw traduzirErro(erro, { padrao: 'Não foi possível carregar as pré-guias.' })
   }
 }
 
-// #76 — detalhe.
 export async function buscarPreGuiaDoFluxo(id) {
   try {
-    if (USAR_MOCK) return await mockBuscarPreGuia(id)
-    const response = await api.get(`/pre-guias/${id}`)
-    return response.data
+    const { data } = await api.get(`/pre-guias/${id}`)
+    return data
   } catch (erro) {
     throw traduzirErro(erro, { 404: 'Pré-guia não encontrada.' })
   }
 }
 
-// dados: { beneficiarioPrecCp, medicoId, procedimentos: [{ procedimentoId, ocsCnpj, quantidade }] }
 export async function criarPreGuia(dados) {
   try {
-    if (USAR_MOCK) return await mockCriarPreGuia(dados)
-    const response = await api.post('/pre-guias', dados)
-    return response.data
+    const { data } = await api.post('/pre-guias', dados)
+    return data
   } catch (erro) {
-    throw traduzirErro(erro, { 400: 'Preencha o beneficiário, o médico e os procedimentos.' })
+    throw traduzirErro(erro, { padrao: 'Não foi possível salvar a pré-guia.' })
   }
 }
 
 export async function editarPreGuia(id, dados) {
   try {
-    if (USAR_MOCK) return await mockEditarPreGuia(id, dados)
-    const response = await api.put(`/pre-guias/${id}`, dados)
-    return response.data
+    const { data } = await api.put(`/pre-guias/${id}`, dados)
+    return data
   } catch (erro) {
-    throw traduzirErro(erro, { 409: 'Esta pré-guia não pode mais ser editada.' })
+    throw traduzirErro(erro, { padrao: 'Não foi possível salvar a pré-guia.' })
   }
 }
 
-// #82 — "Enviar para aprovação": valida e devolve { status, validada, pendencias }.
-export async function enviarParaAprovacao(id) {
+export async function validarPreGuia(id) {
   try {
-    if (USAR_MOCK) return await mockValidarPreGuia(id)
-    const response = await api.post(`/pre-guias/${id}/validar`)
-    return response.data
+    const { data } = await api.post(`/pre-guias/${id}/validar`)
+    return data
   } catch (erro) {
     throw traduzirErro(erro, { 409: 'Esta pré-guia já foi enviada para aprovação.' })
   }
 }
 
-// #77 — o back sabe pelo token se quem aprova é o médico ou o chefe.
+export async function enviarParaAprovacao(id) {
+  return validarPreGuia(id)
+}
+
 export async function aprovarPreGuia(id) {
   try {
-    if (USAR_MOCK) return await mockAprovarPreGuia(id)
-    const response = await api.patch(`/pre-guias/${id}/aprovar`)
-    return response.data
+    const { data } = await api.patch(`/pre-guias/${id}/aprovar`)
+    return data
   } catch (erro) {
-    throw traduzirErro(erro, { 409: 'Esta pré-guia não está aguardando a sua aprovação.' })
+    throw traduzirErro(erro, { padrao: 'Não foi possível aprovar.' })
   }
 }
 
 export async function reprovarPreGuia(id, motivo) {
   try {
-    if (USAR_MOCK) return await mockReprovarPreGuia(id, motivo)
-    const response = await api.patch(`/pre-guias/${id}/reprovar`, { motivo })
-    return response.data
+    const { data } = await api.patch(`/pre-guias/${id}/reprovar`, { motivo })
+    return data
   } catch (erro) {
-    throw traduzirErro(erro, { 400: 'O motivo da reprovação é obrigatório.' })
+    throw traduzirErro(erro, { padrao: 'Não foi possível reprovar.' })
   }
 }
 
-// #78
 export async function emitirGuia(id) {
   try {
-    if (USAR_MOCK) return await mockEmitirGuia(id)
-    const response = await api.post(`/pre-guias/${id}/emitir`)
-    return response.data
+    const { data } = await api.post(`/pre-guias/${id}/emitir`)
+    return data
   } catch (erro) {
-    throw traduzirErro(erro, { 409: 'A guia só pode ser emitida depois das duas aprovações.' })
+    throw traduzirErro(erro, { padrao: 'Não foi possível emitir a guia.' })
+  }
+}
+
+
+const ERRO_DOWNLOAD = {
+  404: 'Pré-guia não encontrada.',
+  409: 'Só pré-guia aprovada ou emitida libera o pacote e o PDF.',
+  padrao: 'Não foi possível baixar o arquivo.'
+}
+
+export async function baixarPacoteSire(id) {
+  try {
+    const { data } = await api.get(`/pre-guias/${id}/pacote-sire`, { responseType: 'blob' })
+    return data
+  } catch (erro) {
+    throw traduzirErro(await lerErroDeBlob(erro), ERRO_DOWNLOAD)
+  }
+}
+
+export async function baixarDocumentoConferencia(id) {
+  try {
+    const { data } = await api.get(`/pre-guias/${id}/documento-conferencia`, { responseType: 'blob' })
+    return data
+  } catch (erro) {
+    throw traduzirErro(await lerErroDeBlob(erro), ERRO_DOWNLOAD)
   }
 }

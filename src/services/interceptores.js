@@ -1,14 +1,10 @@
-import { api } from './http.js'
+import { api } from './api.js'
 import router from '../router'
 import { sessao, encerrarSessao } from '../stores/sessao.js'
 
 api.interceptors.request.use(config => {
     if (sessao.token) {
         config.headers.Authorization = `Bearer ${sessao.token}`
-    }
-    // Provisório até o Spring Security (US000-6): o back identifica médico/chefe pelo Prec-CP.
-    if (sessao.usuario?.precCp) {
-        config.headers['X-Prec-Cp'] = sessao.usuario.precCp
     }
     return config
 })

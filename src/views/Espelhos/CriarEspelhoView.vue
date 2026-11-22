@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { criarEspelho } from '../../services/espelhoService.js'
-import { listarAtendimentosDaOcs } from '../../services/checkMutuoService.js'
+import { listarAtendimentosDaOcs } from '../../services/atendimentoService.js'
 import { sessao } from '../../stores/sessao.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
@@ -40,7 +40,7 @@ const carregando = ref(false)
 const erro = ref('')
 const enviando = ref(false)
 
-// Realizados (beneficiário confirmou), sem espelho e com a última sessão dentro do período.
+// Realizados (baixa final feita) e com a última sessão dentro do período.
 const disponiveis = computed(() =>
   atendimentos.value.filter(a => {
     if (a.statusProcedimento !== 'REALIZADA' || a.espelhoId || !a.dataRealizacao) return false
@@ -157,7 +157,7 @@ onMounted(carregar)
       <section class="fx-cartao">
         <h2 class="fx-secao-titulo">2. Atendimentos realizados no período</h2>
         <p class="fx-suave">
-          Só aparecem atendimentos confirmados pelo beneficiário e que ainda não estão em outro espelho.
+          Só aparecem atendimentos com a baixa final feita. Se um deles já estiver em outro espelho, o envio avisa.
         </p>
 
         <p v-if="carregando" class="fx-alerta fx-alerta-cinza">Carregando atendimentos...</p>

@@ -46,13 +46,3 @@ export function competenciasAbertasParaEspelho() {
   const dia = Number(hojeIso().slice(8, 10))
   return dia <= DIAS_DE_TOLERANCIA ? [deslocar(atual, -1), atual] : [atual]
 }
-
-// Último dia em que ainda chegam espelhos da competência (dia 5 do mês seguinte).
-export function fimDoPrazoDeEnvio(competencia) {
-  return `${deslocar(competencia, 1)}-${String(DIAS_DE_TOLERANCIA).padStart(2, '0')}`
-}
-
-// A fatura só pode ser encaminhada quando não podem mais chegar espelhos daquele mês.
-export function prazoDeEnvioEncerrado(competencia) {
-  return hojeIso() > fimDoPrazoDeEnvio(competencia)
-}

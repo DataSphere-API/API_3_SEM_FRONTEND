@@ -9,13 +9,11 @@ import {
 } from '../../services/fluxoPreGuiaService.js'
 import { sessao } from '../../stores/sessao.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
-import { formatarData } from '../../utils/documentos.js'
-import { numeroPreGuia, seloAprovacao, seloStatus } from '../../utils/fluxoPreGuia.js'
+import { formatarData, formatarDataHora } from '../../utils/documentos.js'
+import { cargoDaAssinatura, numeroPreGuia, seloAprovacao, seloStatus } from '../../utils/fluxoPreGuia.js'
 
 const souMedico = sessao.perfilAtivo === 'MEDICO'
-const meuCampo = souMedico ? 'medicoAprovou' : 'chefeAprovou'
-const outroCampo = souMedico ? 'chefeAprovou' : 'medicoAprovou'
-const outroRotulo = souMedico ? 'Chefe do FUSEx' : 'Médico'
+const meuCargo = cargoDaAssinatura(sessao.perfilAtivo)
 
 const aba = ref('pendentes')
 const preGuias = ref([])
@@ -29,20 +27,17 @@ const reprovando = ref(false)
 const erroDecisao = ref('')
 const decidindo = ref(false)
 
-const pendentes = computed(() => preGuias.value.filter(p => p.status === 'VALIDADA' && !p[meuCampo]))
+const pendentes = computed(() => preGuias.value.filter(p => p.status === 'VALIDADA'))
 const lista = computed(() => (aba.value === 'pendentes' ? pendentes.value : preGuias.value))
-
-const minhaAprovacaoPendente = computed(() => {
-  const p = selecionada.value
-  if (!p || p.status !== 'VALIDADA') return false
-  return souMedico ? !p.dataAprovacaoMedico : !p.dataAprovacaoChefe
-})
+const podeDecidir = computed(() => selecionada.value?.status === 'VALIDADA')
 
 async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    preGuias.value = (await listarPreGuiasDoFluxo()).sort((a, b) => a.dataCriacao.localeCompare(b.dataCriacao))
+    // O médico vê só as pré-guias em que é o responsável; o chefe vê todas.
+    const resultado = await listarPreGuiasDoFluxo({ minhas: souMedico })
+    preGuias.value = resultado.sort((a, b) => a.dataCriacao.localeCompare(b.dataCriacao))
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar as pré-guias.'
   } finally {
@@ -70,10 +65,7 @@ async function aprovar() {
   decidindo.value = true
   try {
     const resposta = await aprovarPreGuia(selecionada.value.id)
-    aviso.value =
-      resposta.status === 'APROVADA'
-        ? `${numeroPreGuia(resposta.preGuiaId)} aprovada. Com as duas aprovações, ela já foi para o emissor.`
-        : `${numeroPreGuia(resposta.preGuiaId)} aprovada. Falta a aprovação do ${outroRotulo}.`
+    aviso.value = `${numeroPreGuia(resposta.preGuiaId)} aprovada e assinada por ${resposta.assinatura.nome} em ${formatarDataHora(resposta.assinatura.dataHora)}. Ela já foi para o emissor.`
     selecionada.value = null
     await carregar()
   } catch (e) {
@@ -92,7 +84,7 @@ async function reprovar() {
   decidindo.value = true
   try {
     const resposta = await reprovarPreGuia(selecionada.value.id, motivo.value)
-    aviso.value = `${numeroPreGuia(resposta.preGuiaId)} reprovada.`
+    aviso.value = `${numeroPreGuia(resposta.preGuiaId)} reprovada por ${resposta.assinatura.nome} em ${formatarDataHora(resposta.assinatura.dataHora)}.`
     selecionada.value = null
     await carregar()
   } catch (e) {
@@ -111,7 +103,7 @@ onMounted(carregar)
       <header>
         <h1 class="fx-titulo">Pré-guias para aprovar</h1>
         <p class="fx-subtitulo">
-          Médico e Chefe do FUSEx aprovam em paralelo. A guia só vai para o emissor quando os dois aprovam.
+          Basta a aprovação do médico responsável ou do Chefe do FUSEx. Quem decide assina com nome, data e hora.
         </p>
       </header>
 
@@ -158,13 +150,11 @@ onMounted(carregar)
             </p>
             <div class="cartao-rodape">
               <span class="fx-suave">
-                Criada em {{ formatarData(p.dataCriacao) }} · {{ outroRotulo }}:
-                <span class="fx-selo" :class="seloAprovacao(p.status, p[outroCampo]).classe">
-                  {{ seloAprovacao(p.status, p[outroCampo]).texto }}
-                </span>
+                Criada em {{ formatarData(p.dataCriacao) }} ·
+                <span class="fx-selo" :class="seloAprovacao(p).classe">{{ seloAprovacao(p).texto }}</span>
               </span>
               <button type="button" class="fx-botao" @click="abrir(p.id)">
-                {{ p.status === 'VALIDADA' && !p[meuCampo] ? 'Analisar' : 'Ver detalhes' }}
+                {{ p.status === 'VALIDADA' ? 'Analisar' : 'Ver detalhes' }}
               </button>
             </div>
           </li>
@@ -180,8 +170,11 @@ onMounted(carregar)
           <PreGuiaResumo :pre-guia="selecionada" />
         </article>
 
-        <section v-if="minhaAprovacaoPendente" class="fx-cartao">
+        <section v-if="podeDecidir" class="fx-cartao">
           <h2 class="fx-secao-titulo">Sua decisão</h2>
+          <p class="fx-suave">
+            A decisão será assinada por <strong>{{ sessao.usuario.nome }}</strong> ({{ meuCargo }}) com a data e a hora do registro.
+          </p>
           <p v-if="erroDecisao" class="fx-alerta fx-alerta-vermelho" role="alert">{{ erroDecisao }}</p>
 
           <template v-if="reprovando">

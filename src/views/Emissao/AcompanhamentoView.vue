@@ -2,45 +2,80 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import PreGuiaResumo from '../../components/PreGuiaResumo.vue'
+import PainelValidacaoPreGuia from './components/PainelValidacaoPreGuia.vue'
 import {
   listarPreGuiasDoFluxo,
   buscarPreGuiaDoFluxo,
-  enviarParaAprovacao
+  enviarParaAprovacao,
+  emitirGuia
 } from '../../services/fluxoPreGuiaService.js'
 import { formatarMoeda } from '../../utils/avaliarLisura.js'
 import { formatarData } from '../../utils/documentos.js'
-import { EDITAVEIS, numeroPreGuia, seloAprovacao, seloStatus } from '../../utils/fluxoPreGuia.js'
+import { EDITAVEIS, ENVIAVEIS, numeroPreGuia, seloAprovacao, seloStatus } from '../../utils/fluxoPreGuia.js'
 
 const route = useRoute()
 
 const FILTROS = [
+  { valor: 'TODAS', rotulo: 'Todas', status: null },
   { valor: 'ABERTAS', rotulo: 'Em andamento', status: ['PRE_GUIA', 'COM_PENDENCIAS', 'VALIDADA'] },
   { valor: 'COM_PENDENCIAS', rotulo: 'Com pendências', status: ['COM_PENDENCIAS'] },
-  { valor: 'REPROVADA', rotulo: 'Reprovadas', status: ['REPROVADA'] },
-  { valor: 'TODAS', rotulo: 'Todas', status: null }
+  { valor: 'APROVADA', rotulo: 'Aprovadas / Prontas', status: ['APROVADA'] },
+  { valor: 'EMITIDA', rotulo: 'Emitidas', status: ['EMITIDA'] },
+  { valor: 'REPROVADA', rotulo: 'Reprovadas', status: ['REPROVADA'] }
 ]
+
+const PRIORIDADE_STATUS = {
+  COM_PENDENCIAS: 1,
+  PRE_GUIA: 2,
+  VALIDADA: 3,
+  APROVADA: 4,
+  REPROVADA: 5,
+  EMITIDA: 6
+}
 
 const preGuias = ref([])
 const carregando = ref(false)
 const erro = ref('')
 const aviso = ref(route.query.salva ? `${numeroPreGuia(route.query.salva)} salva como rascunho.` : '')
 const avisoTom = ref('verde')
-const filtro = ref('ABERTAS')
+const filtro = ref('TODAS')
+const termoBusca = ref('')
 const detalhe = ref(null)
 const enviando = ref(null)
+const emitindo = ref(null)
+
+function pesoPrioridade(status) {
+  return PRIORIDADE_STATUS[status] ?? 99
+}
 
 const lista = computed(() => {
-  const status = FILTROS.find(f => f.valor === filtro.value).status
-  return status ? preGuias.value.filter(p => status.includes(p.status)) : preGuias.value
+  const statusPermitidos = FILTROS.find(f => f.valor === filtro.value).status
+  const busca = termoBusca.value.toLowerCase().trim()
+
+  return preGuias.value
+    .filter(p => {
+      if (statusPermitidos && !statusPermitidos.includes(p.status)) return false
+      if (!busca) return true
+
+      const nome = (p.beneficiarioNome || p.beneficiario?.nome || '').toLowerCase()
+      const precCp = (p.beneficiarioPrecCp || p.beneficiario?.precCp || p.precCp || '').toLowerCase()
+      return nome.includes(busca) || precCp.includes(busca)
+    })
+    .sort((a, b) => {
+      const diffPrioridade = pesoPrioridade(a.status) - pesoPrioridade(b.status)
+      if (diffPrioridade !== 0) return diffPrioridade
+      return b.id - a.id
+    })
 })
 
 const comPendencias = computed(() => preGuias.value.filter(p => p.status === 'COM_PENDENCIAS').length)
+const reprovadas = computed(() => preGuias.value.filter(p => p.status === 'REPROVADA').length)
 
 async function carregar() {
   carregando.value = true
   erro.value = ''
   try {
-    preGuias.value = (await listarPreGuiasDoFluxo()).sort((a, b) => b.id - a.id)
+    preGuias.value = await listarPreGuiasDoFluxo()
   } catch (e) {
     erro.value = e.mensagemUsuario || 'Não foi possível carregar as pré-guias.'
   } finally {
@@ -55,14 +90,32 @@ async function enviar(p) {
     const resultado = await enviarParaAprovacao(p.id)
     avisoTom.value = resultado.validada ? 'verde' : 'ambar'
     aviso.value = resultado.validada
-      ? `${numeroPreGuia(p.id)} enviada para o Médico e para o Chefe do FUSEx.`
+      ? `${numeroPreGuia(p.id)} enviada para aprovação do médico responsável ou do Chefe do FUSEx.`
       : `${numeroPreGuia(p.id)} ficou com pendências: ${resultado.pendencias.map(x => x.mensagem).join('; ')}.`
+    detalhe.value = null
     await carregar()
   } catch (e) {
     avisoTom.value = 'vermelho'
     aviso.value = e.mensagemUsuario || 'Não foi possível enviar.'
   } finally {
     enviando.value = null
+  }
+}
+
+async function emitir(id) {
+  aviso.value = ''
+  emitindo.value = id
+  try {
+    const guia = await emitirGuia(id)
+    avisoTom.value = 'verde'
+    aviso.value = `Guia ${numeroPreGuia(id)} emitida com sucesso! Os atendimentos já aparecem para as OCS.`
+    detalhe.value = null
+    await carregar()
+  } catch (e) {
+    avisoTom.value = 'vermelho'
+    aviso.value = e.mensagemUsuario || 'Não foi possível emitir a guia.'
+  } finally {
+    emitindo.value = null
   }
 }
 
@@ -83,7 +136,7 @@ onMounted(carregar)
       <header class="fx-topo-pagina">
         <div>
           <h1 class="fx-titulo">Acompanhamento das pré-guias</h1>
-          <p class="fx-subtitulo">Rascunhos, pendências e a situação de cada pré-guia com o Médico e o Chefe do FUSEx.</p>
+          <p class="fx-subtitulo">Rascunhos, pendências, aprovações e emissão de guias do FUSEx.</p>
         </div>
         <router-link to="/emissor/pre-guias/nova" class="fx-botao link-botao">Criar pré-guia</router-link>
       </header>
@@ -92,18 +145,46 @@ onMounted(carregar)
       <p v-if="comPendencias" class="fx-alerta fx-alerta-ambar">
         {{ comPendencias }} pré-guia(s) com pendências aguardando sua correção.
       </p>
+      <p v-if="reprovadas" class="fx-alerta fx-alerta-ambar">
+        {{ reprovadas }} pré-guia(s) reprovada(s). Abra os detalhes, veja o motivo e use "Editar e reenviar".
+      </p>
 
-      <div class="filtros">
-        <button
-          v-for="f in FILTROS"
-          :key="f.valor"
-          type="button"
-          class="fx-botao-secundario"
-          :class="{ 'filtro-ativo': filtro === f.valor }"
-          @click="filtro = f.valor"
-        >
-          {{ f.rotulo }}
-        </button>
+      <div class="barra-controles">
+        <div class="filtros">
+          <button
+            v-for="f in FILTROS"
+            :key="f.valor"
+            type="button"
+            class="fx-botao-secundario"
+            :class="{ 'filtro-ativo': filtro === f.valor }"
+            @click="filtro = f.valor"
+          >
+            {{ f.rotulo }}
+          </button>
+        </div>
+
+        <div class="busca-container">
+          <div class="input-com-icone">
+            <svg class="icone-busca" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input
+              v-model="termoBusca"
+              type="text"
+              class="fx-entrada input-busca-largo"
+              placeholder="Pesquisar por nome do beneficiário ou Prec-CP completo..."
+            />
+          </div>
+          <button
+            v-if="termoBusca"
+            type="button"
+            class="fx-botao-secundario"
+            @click="termoBusca = ''"
+          >
+            Limpar
+          </button>
+        </div>
       </div>
 
       <p v-if="carregando" class="fx-alerta fx-alerta-cinza">Carregando pré-guias...</p>
@@ -117,8 +198,7 @@ onMounted(carregar)
               <th>Beneficiário</th>
               <th>Procedimentos</th>
               <th>Criada</th>
-              <th>Médico</th>
-              <th>Chefe do FUSEx</th>
+              <th>Aprovação</th>
               <th>Situação</th>
               <th><span class="fx-suave">Ação</span></th>
             </tr>
@@ -130,30 +210,17 @@ onMounted(carregar)
               <td>{{ p.qtdProcedimentos }} · {{ formatarMoeda(p.valorTotal) }}</td>
               <td>{{ formatarData(p.dataCriacao) }}</td>
               <td>
-                <span class="fx-selo" :class="seloAprovacao(p.status, p.medicoAprovou).classe">
-                  {{ seloAprovacao(p.status, p.medicoAprovou).texto }}
-                </span>
-              </td>
-              <td>
-                <span class="fx-selo" :class="seloAprovacao(p.status, p.chefeAprovou).classe">
-                  {{ seloAprovacao(p.status, p.chefeAprovou).texto }}
-                </span>
+                <span class="fx-selo" :class="seloAprovacao(p).classe">{{ seloAprovacao(p).texto }}</span>
               </td>
               <td>
                 <span class="fx-selo" :class="seloStatus(p.status).classe">{{ seloStatus(p.status).texto }}</span>
               </td>
               <td class="acoes">
-                <template v-if="EDITAVEIS.includes(p.status)">
-                  <button type="button" class="fx-botao" :disabled="enviando === p.id" @click="enviar(p)">
-                    {{ enviando === p.id ? 'Enviando...' : 'Enviar' }}
-                  </button>
-                  <router-link :to="`/emissor/pre-guias/${p.id}/editar`" class="fx-botao-secundario link-botao">Editar</router-link>
-                </template>
                 <button type="button" class="fx-botao-secundario" @click="abrirDetalhe(p.id)">Detalhes</button>
               </td>
             </tr>
             <tr v-if="lista.length === 0">
-              <td colspan="8" class="fx-suave">Nenhuma pré-guia neste filtro.</td>
+              <td colspan="7" class="fx-suave">Nenhuma pré-guia neste filtro.</td>
             </tr>
           </tbody>
         </table>
@@ -168,6 +235,41 @@ onMounted(carregar)
         </div>
         <div class="fx-modal-corpo">
           <PreGuiaResumo :pre-guia="detalhe" />
+
+          <PainelValidacaoPreGuia
+            :pre-guia="detalhe"
+            @atualizar="carregar(); detalhe = null;"
+          />
+
+          <div class="modal-rodape-acoes">
+            <button
+              v-if="detalhe.status === 'APROVADA'"
+              type="button"
+              class="fx-botao"
+              :disabled="emitindo === detalhe.id"
+              @click="emitir(detalhe.id)"
+            >
+              {{ emitindo === detalhe.id ? 'Emitindo...' : 'Emitir Guia' }}
+            </button>
+            <router-link
+              v-if="EDITAVEIS.includes(detalhe.status)"
+              :to="`/emissor/pre-guias/${detalhe.id}/editar`"
+              class="link-botao"
+              :class="detalhe.status === 'REPROVADA' ? 'fx-botao' : 'fx-botao-secundario'"
+            >
+              {{ detalhe.status === 'REPROVADA' ? 'Editar e reenviar' : 'Editar' }}
+            </router-link>
+            <button
+              v-if="ENVIAVEIS.includes(detalhe.status)"
+              type="button"
+              class="fx-botao"
+              :class="{ 'btn-destaque-atencao': detalhe.status === 'COM_PENDENCIAS' }"
+              :disabled="enviando === detalhe.id"
+              @click="enviar(detalhe)"
+            >
+              {{ enviando === detalhe.id ? 'Processando...' : (detalhe.status === 'COM_PENDENCIAS' ? 'Corrigir e Enviar' : 'Enviar') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -175,10 +277,46 @@ onMounted(carregar)
 </template>
 
 <style scoped>
+.barra-controles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
 .filtros {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.busca-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 350px;
+  max-width: 500px;
+}
+
+.input-com-icone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.icone-busca {
+  position: absolute;
+  left: 12px;
+  color: var(--fx-texto-suave, #666);
+  pointer-events: none;
+}
+
+.input-busca-largo {
+  width: 100%;
+  padding-left: 36px !important;
 }
 
 .filtro-ativo {
@@ -197,5 +335,25 @@ onMounted(carregar)
   display: inline-flex;
   align-items: center;
   text-decoration: none;
+}
+
+.modal-rodape-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--fx-borda);
+}
+
+.btn-destaque-atencao {
+  animation: pulse-soft 2s infinite;
+  font-weight: 600;
+}
+
+@keyframes pulse-soft {
+  0% { opacity: 1; }
+  50% { opacity: 0.85; transform: scale(1.02); }
+  100% { opacity: 1; }
 }
 </style>

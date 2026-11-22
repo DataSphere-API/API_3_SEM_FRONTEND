@@ -1,80 +1,61 @@
 <script setup>
 import { formatarDataHora } from '../utils/documentos.js'
+import {
+  tituloDoEvento,
+  traduzirEntidadeHistorico,
+  traduzirOrigemHistorico,
+  traduzirStatusHistorico
+} from '../utils/historico.js'
 
-// eventos no formato do HistoricoStatusResponse (US001-3).
+// Recebe { eventos } com a lista de HistoricoStatusResponse do back.
 defineProps({
-  eventos: { type: Array, required: true }
+  linhaDoTempo: { type: Object, required: true }
 })
-
-const STATUS = {
-  PENDENTE: 'A realizar',
-  EM_ANDAMENTO: 'Em andamento',
-  REALIZADA: 'Realizado',
-  FATURADA: 'Faturado',
-  EM_ABERTO: 'Recebido para auditoria',
-  APROVADO: 'Aprovado',
-  REPROVADO: 'Reprovado e devolvido à OCS',
-  FATURADO: 'Faturado',
-  CANCELADO: 'Cancelado',
-  ATIVA: 'Fatura aberta',
-  ENCAMINHADA_APROVACAO: 'Encaminhada para aprovação'
-}
-
-const ORIGEM = {
-  'emissao-da-guia': 'Guia emitida pelo FUSEx',
-  'confirmacao-do-beneficiario': 'Confirmado pelo beneficiário',
-  'envio-pela-ocs': 'Enviado pela OCS',
-  'reenvio-pela-ocs': 'Corrigido e reenviado pela OCS',
-  auditoria: 'Auditoria',
-  'aprovacao-do-espelho': 'Aberta com o primeiro espelho aprovado do mês',
-  'encaminhamento-para-aprovacao': 'Encaminhada para aprovação'
-}
-
-function rotulo(status) {
-  return STATUS[status] || status
-}
 </script>
 
 <template>
-  <p v-if="eventos.length === 0" class="fx-suave vazio">Nenhuma mudança registrada.</p>
-  <ol v-else class="linha">
-    <li v-for="e in eventos" :key="e.id" class="evento">
-      <span class="marcador" aria-hidden="true"></span>
-      <div>
-        <strong>{{ rotulo(e.statusNovo) }}</strong>
-        <span v-if="e.statusAnterior" class="fx-suave"> (antes: {{ rotulo(e.statusAnterior) }})</span>
-        <div class="fx-suave">{{ formatarDataHora(e.data) }} · {{ ORIGEM[e.origem] || e.origem }}</div>
-      </div>
-    </li>
-  </ol>
+  <div class="container-linha-tempo">
+    <p v-if="!linhaDoTempo.eventos || linhaDoTempo.eventos.length === 0" class="fx-suave vazio">
+      Nenhuma mudança registrada.
+    </p>
+
+    <ol v-else class="linha">
+      <li v-for="(e, i) in linhaDoTempo.eventos" :key="e.id ?? `${e.entidadeId}-${e.data}-${i}`" class="evento">
+        <span class="marcador" aria-hidden="true"></span>
+        <div>
+          <div class="titulo-evento">
+            <strong>{{ tituloDoEvento(e) }}</strong>
+            <span v-if="traduzirEntidadeHistorico(e.entidadeTipo)" class="fx-selo fx-selo-cinza entidade">
+              {{ traduzirEntidadeHistorico(e.entidadeTipo) }}
+            </span>
+          </div>
+
+          <div class="status-evento">
+            {{ traduzirStatusHistorico(e.statusNovo) }}
+            <span v-if="e.statusAnterior" class="fx-suave">(antes: {{ traduzirStatusHistorico(e.statusAnterior) }})</span>
+          </div>
+
+          <div class="fx-suave meta">
+            {{ formatarDataHora(e.data) }} · {{ traduzirOrigemHistorico(e.origem) }}
+            <template v-if="e.usuarioNome"> · por {{ e.usuarioNome }}</template>
+          </div>
+        </div>
+      </li>
+    </ol>
+  </div>
 </template>
 
 <style scoped>
-.vazio {
-  margin: 0;
-}
-
-.linha {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.container-linha-tempo {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
-.evento {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-}
-
-.marcador {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  margin-top: 0.4rem;
-  border-radius: 50%;
-  background-color: var(--fx-verde);
-}
+.linha { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 1rem; }
+.evento { display: flex; gap: 0.75rem; align-items: flex-start; }
+.marcador { flex: none; width: 10px; height: 10px; margin-top: 0.4rem; border-radius: 50%; background-color: var(--fx-verde); }
+.titulo-evento { display: flex; align-items: center; gap: 0.5rem; }
+.status-evento { font-weight: 500; margin-top: 0.2rem; }
+.meta { font-size: 0.85em; margin-top: 0.2rem; }
 </style>
